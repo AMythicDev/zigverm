@@ -4,13 +4,15 @@ const Client = std.http.Client;
 const json = std.json;
 const builtin = @import("builtin");
 const cli = @import("cli.zig");
+const File = std.fs.file;
 
 const Rel = union(enum) { Master, Version: []const u8 };
 
 const InstallError = error{
     ReleaseNotFound,
     InvalidVersion,
-};
+    TargetNotAvailable,
+} || std.Uri.ParseError || Client.RequestError || Client.Request.WaitError || std.fs.File.OpenError || Client.Request.ReadError || std.posix.WriteError;
 
 const JsonResponse = struct {
     body: [100 * 1024]u8,
@@ -43,15 +45,53 @@ pub fn main() !void {
     }
 }
 
-pub fn install_release(_: *Client, releases: json.Parsed(json.Value), rel: Rel) InstallError!void {
+pub fn install_release(client: *Client, releases: json.Parsed(json.Value), rel: Rel) InstallError!void {
     var release: json.Value = undefined;
+    var release_string = undefined;
     switch (rel) {
         Rel.Master => {
             release = releases.value.object.get("master").?;
+            release_string = "master";
         },
         Rel.Version => |v| {
             release = releases.value.object.get(v) orelse return InstallError.ReleaseNotFound;
+            release_string = v;
         },
+    }
+
+    const os = builtin.target.os.tag;
+    const arch = builtin.target.cpu.arch;
+
+    const dw_target = @tagName(arch) ++ "-" ++ @tagName(os);
+    const target = release.object.get(dw_target) orelse return InstallError.TargetNotAvailable;
+    const tarball_url = target.object.get("tarball").?.string;
+    const tarball_dw_filename = "zig-" ++ dw_target ++ "-" ++ release_string ++ ".tar.xz.partial";
+
+    const cwd = std.fs.cwd();
+    const tarball = try cwd.createFile(tarball_dw_filename, .{});
+    defer tarball.close();
+    download_tarball(client, tarball_url, tarball);
+}
+
+fn download_tarball(client: *Client, tb_url: []const u8, tarball: *File) InstallError!void {
+    const tarball_uri = try std.Uri.parse(tb_url);
+
+    var http_header_buff: [1024]u8 = undefined;
+    var req = try client.open(http.Method.GET, tarball_uri, Client.RequestOptions{ .server_header_buffer = &http_header_buff });
+    defer req.deinit();
+
+    try req.send();
+    try req.wait();
+    var reader = req.reader();
+
+    var tarball_writer = tarball.writer();
+    var buff: [1024]u8 = undefined;
+    while (true) {
+        const len = try reader.read(&buff);
+        if (len == 0) {
+            break;
+        }
+        _ = try tarball_writer.write(buff[0..len]);
     }
 }
 
