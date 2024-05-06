@@ -70,10 +70,12 @@ pub fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(
     const tarball_dw_filename = try std.mem.concat(alloc, u8, &[_][]const u8{ "zig-" ++ dw_target ++ "-", release_string, ".tar.xz.partial" });
 
     const cwd = std.fs.cwd();
-    const tarball = try cwd.createFile(tarball_dw_filename, .{});
-    defer tarball.close();
-    const tarball_writer = tarball.writer();
-    try download_tarball(client, tarball_url, tarball_writer);
+    if (cwd.openFile(tarball_dw_filename, .{}) == File.OpenError.FileNotFound) {
+        const tarball = try cwd.createFile(tarball_dw_filename, .{});
+        defer tarball.close();
+        const tarball_writer = tarball.writer();
+        try download_tarball(client, tarball_url, tarball_writer);
+    }
 }
 
 fn download_tarball(client: *Client, tb_url: []const u8, tb_writer: std.fs.File.Writer) InstallError!void {
@@ -98,21 +100,36 @@ fn download_tarball(client: *Client, tb_url: []const u8, tb_writer: std.fs.File.
 }
 
 fn get_json_dslist(client: *Client) anyerror!JsonResponse {
+    std.log.info("Fetching the latest index", .{});
     const uri = try std.Uri.parse("https://ziglang.org/download/index.json");
 
     var http_header_buff: [1024]u8 = undefined;
-    var req = try client.open(
-        http.Method.GET,
-        uri,
-        Client.RequestOptions{ .server_header_buffer = &http_header_buff },
-    );
-    defer req.deinit();
 
-    try req.send();
-    try req.wait();
+    var req: ?std.http.Client.Request = null;
+    defer req.?.deinit();
+    for (0..5) |i| {
+        const tryreq = client.open(
+            http.Method.GET,
+            uri,
+            Client.RequestOptions{ .server_header_buffer = &http_header_buff },
+        );
+        if (tryreq) |r| {
+            req = r;
+        } else |err| {
+            std.log.warn("{}. Retrying again [{}/5]", .{ err, i + 1 });
+            std.time.sleep(std.time.ns_per_ms * 500);
+        }
+    }
+    if (req == null) {
+        std.log.err("Error fetching index. Exitting (1)...", .{});
+        std.process.exit(1);
+    }
+
+    try req.?.send();
+    try req.?.wait();
 
     var json_buff: [1024 * 100]u8 = undefined;
-    const bytes_read = try req.reader().readAll(&json_buff);
+    const bytes_read = try req.?.reader().readAll(&json_buff);
 
     return JsonResponse{ .body = json_buff, .length = bytes_read };
 }
