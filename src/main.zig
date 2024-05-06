@@ -4,7 +4,8 @@ const Client = std.http.Client;
 const json = std.json;
 const builtin = @import("builtin");
 const cli = @import("cli.zig");
-const File = std.fs.file;
+const File = std.fs.File;
+const Allocator = std.mem.Allocator;
 
 const Rel = union(enum) { Master, Version: []const u8 };
 
@@ -35,9 +36,9 @@ pub fn main() !void {
             defer releases.deinit();
 
             if (std.mem.eql(u8, rel, "master")) {
-                return try install_release(&client, releases, Rel.Master);
+                return try install_release(alloc, &client, releases, Rel.Master);
             } else if (std.SemanticVersion.parse(rel)) |_| {
-                try install_release(&client, releases, Rel{ .Version = rel });
+                try install_release(alloc, &client, releases, Rel{ .Version = rel });
             } else |_| {
                 return InstallError.InvalidVersion;
             }
@@ -45,9 +46,9 @@ pub fn main() !void {
     }
 }
 
-pub fn install_release(client: *Client, releases: json.Parsed(json.Value), rel: Rel) InstallError!void {
+pub fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(json.Value), rel: Rel) InstallError!void {
     var release: json.Value = undefined;
-    var release_string = undefined;
+    var release_string: []const u8 = undefined;
     switch (rel) {
         Rel.Master => {
             release = releases.value.object.get("master").?;
@@ -65,15 +66,17 @@ pub fn install_release(client: *Client, releases: json.Parsed(json.Value), rel: 
     const dw_target = @tagName(arch) ++ "-" ++ @tagName(os);
     const target = release.object.get(dw_target) orelse return InstallError.TargetNotAvailable;
     const tarball_url = target.object.get("tarball").?.string;
-    const tarball_dw_filename = "zig-" ++ dw_target ++ "-" ++ release_string ++ ".tar.xz.partial";
+
+    const tarball_dw_filename = try std.mem.concat(alloc, u8, &[_][]const u8{ "zig-" ++ dw_target ++ "-", release_string, ".tar.xz.partial" });
 
     const cwd = std.fs.cwd();
     const tarball = try cwd.createFile(tarball_dw_filename, .{});
     defer tarball.close();
-    download_tarball(client, tarball_url, tarball);
+    const tarball_writer = tarball.writer();
+    try download_tarball(client, tarball_url, tarball_writer);
 }
 
-fn download_tarball(client: *Client, tb_url: []const u8, tarball: *File) InstallError!void {
+fn download_tarball(client: *Client, tb_url: []const u8, tb_writer: std.fs.File.Writer) InstallError!void {
     const tarball_uri = try std.Uri.parse(tb_url);
 
     var http_header_buff: [1024]u8 = undefined;
@@ -84,14 +87,13 @@ fn download_tarball(client: *Client, tb_url: []const u8, tarball: *File) Install
     try req.wait();
     var reader = req.reader();
 
-    var tarball_writer = tarball.writer();
     var buff: [1024]u8 = undefined;
     while (true) {
         const len = try reader.read(&buff);
         if (len == 0) {
             break;
         }
-        _ = try tarball_writer.write(buff[0..len]);
+        _ = try tb_writer.write(buff[0..len]);
     }
 }
 
