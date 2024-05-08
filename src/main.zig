@@ -81,13 +81,16 @@ pub fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(
 fn download_tarball(client: *Client, tb_url: []const u8, tb_writer: std.fs.File.Writer) InstallError!void {
     const tarball_uri = try std.Uri.parse(tb_url);
 
-    var http_header_buff: [1024]u8 = undefined;
-    var req = try client.open(http.Method.GET, tarball_uri, Client.RequestOptions{ .server_header_buffer = &http_header_buff });
-    defer req.deinit();
+    var req = make_request(client, tarball_uri);
+    defer req.?.deinit();
+    if (req == null) {
+        std.log.err("Failed fetching the install tarball. Exitting (1)...", .{});
+        std.process.exit(1);
+    }
 
-    try req.send();
-    try req.wait();
-    var reader = req.reader();
+    try req.?.send();
+    try req.?.wait();
+    var reader = req.?.reader();
 
     var buff: [1024]u8 = undefined;
     while (true) {
@@ -103,10 +106,24 @@ fn get_json_dslist(client: *Client) anyerror!JsonResponse {
     std.log.info("Fetching the latest index", .{});
     const uri = try std.Uri.parse("https://ziglang.org/download/index.json");
 
-    var http_header_buff: [1024]u8 = undefined;
-
-    var req: ?std.http.Client.Request = null;
+    var req = make_request(client, uri);
     defer req.?.deinit();
+    if (req == null) {
+        std.log.err("Failed fetching the index. Exitting (1)...", .{});
+        std.process.exit(1);
+    }
+
+    try req.?.send();
+    try req.?.wait();
+
+    var json_buff: [1024 * 100]u8 = undefined;
+    const bytes_read = try req.?.reader().readAll(&json_buff);
+
+    return JsonResponse{ .body = json_buff, .length = bytes_read };
+}
+
+fn make_request(client: *Client, uri: std.Uri) ?Client.Request {
+    var http_header_buff: [1024]u8 = undefined;
     for (0..5) |i| {
         const tryreq = client.open(
             http.Method.GET,
@@ -114,19 +131,15 @@ fn get_json_dslist(client: *Client) anyerror!JsonResponse {
             Client.RequestOptions{ .server_header_buffer = &http_header_buff },
         );
         if (tryreq) |r| {
-            req = r;
+            return r;
         } else |err| {
             std.log.warn("{}. Retrying again [{}/5]", .{ err, i + 1 });
             std.time.sleep(std.time.ns_per_ms * 500);
         }
     }
-    if (req == null) {
-        std.log.err("Error fetching index. Exitting (1)...", .{});
-        std.process.exit(1);
-    }
+    return null;
+}
 
-    try req.?.send();
-    try req.?.wait();
 
     var json_buff: [1024 * 100]u8 = undefined;
     const bytes_read = try req.?.reader().readAll(&json_buff);
