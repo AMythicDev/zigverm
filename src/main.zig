@@ -140,9 +140,19 @@ fn make_request(client: *Client, uri: std.Uri) ?Client.Request {
     return null;
 }
 
+fn check_hash(hashstr: *const [64]u8, reader: std.fs.File.Reader) !bool {
+    var buff: [1024]u8 = undefined;
 
-    var json_buff: [1024 * 100]u8 = undefined;
-    const bytes_read = try req.?.reader().readAll(&json_buff);
+    var hasher = Sha256.init(.{});
 
-    return JsonResponse{ .body = json_buff, .length = bytes_read };
+    while (true) {
+        const len = try reader.read(&buff);
+        if (len == 0) {
+            break;
+        }
+        hasher.update(buff[0..len]);
+    }
+    var hash: [32]u8 = undefined;
+    _ = try std.fmt.hexToBytes(&hash, hashstr);
+    return std.mem.eql(u8, &hasher.finalResult(), &hash);
 }
