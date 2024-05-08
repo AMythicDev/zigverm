@@ -6,6 +6,7 @@ const builtin = @import("builtin");
 const cli = @import("cli.zig");
 const File = std.fs.File;
 const Allocator = std.mem.Allocator;
+const Sha256 = std.crypto.hash.sha2.Sha256;
 
 const Rel = union(enum) { Master, Version: []const u8 };
 
