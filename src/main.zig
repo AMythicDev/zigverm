@@ -9,11 +9,7 @@ const Allocator = std.mem.Allocator;
 
 const Rel = union(enum) { Master, Version: []const u8 };
 
-const InstallError = error{
-    ReleaseNotFound,
-    InvalidVersion,
-    TargetNotAvailable,
-} || std.Uri.ParseError || Client.RequestError || Client.Request.WaitError || std.fs.File.OpenError || Client.Request.ReadError || std.posix.WriteError;
+const InstallError = error{ ReleaseNotFound, InvalidVersion, TargetNotAvailable, InvalidLength } || std.Uri.ParseError || Client.RequestError || Client.Request.WaitError || std.fs.File.OpenError || Client.Request.ReadError || std.fs.File.WriteError || std.fs.File.ReadError;
 
 const JsonResponse = struct {
     body: [100 * 1024]u8,
@@ -70,11 +66,15 @@ pub fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(
     const tarball_dw_filename = try std.mem.concat(alloc, u8, &[_][]const u8{ "zig-" ++ dw_target ++ "-", release_string, ".tar.xz.partial" });
 
     const cwd = std.fs.cwd();
-    if (cwd.openFile(tarball_dw_filename, .{}) == File.OpenError.FileNotFound) {
+    var tarball_file = cwd.openFile(tarball_dw_filename, .{});
+    if (tarball_file == File.OpenError.FileNotFound) {
         const tarball = try cwd.createFile(tarball_dw_filename, .{});
         defer tarball.close();
         const tarball_writer = tarball.writer();
         try download_tarball(client, tarball_url, tarball_writer);
+        tarball_file = cwd.openFile(tarball_dw_filename, .{});
+    } else {
+        std.log.info("Found already existing tarball, using that", .{});
     }
 }
 
