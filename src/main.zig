@@ -18,8 +18,8 @@ const JsonResponse = struct {
 };
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const alloc = gpa.allocator();
+    var aa = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    const alloc = aa.allocator();
 
     const command = try cli.read_args(alloc);
 
