@@ -10,7 +10,34 @@ const Sha256 = std.crypto.hash.sha2.Sha256;
 
 const Rel = union(enum) { Master, Version: []const u8 };
 
-const InstallError = error{ ReleaseNotFound, InvalidVersion, TargetNotAvailable, InvalidLength } || std.Uri.ParseError || Client.RequestError || Client.Request.WaitError || std.fs.File.OpenError || Client.Request.ReadError || std.fs.File.WriteError || std.fs.File.ReadError;
+const InstallError = error{
+    ReleaseNotFound,
+    InvalidVersion,
+    TargetNotAvailable,
+    InvalidLength,
+    CorruptInput,
+    WrongChecksum,
+    BadHeader,
+    EndOfStreamWithNoError,
+    Unsupported,
+    UnexpectedEndOfStream,
+    TarHeader,
+    TarHeaderChksum,
+    TarNumericValueNegative,
+    TarNumericValueTooBig,
+    TarInsufficientBuffer,
+    StreamTooLong,
+    PaxNullInKeyword,
+    PaxInvalidAttributeEnd,
+    PaxSizeAttrOverflow,
+    PaxNullInValue,
+    TarHeadersTooBig,
+    TarUnsupportedHeader,
+    LinkQuotaExceeded,
+    ReadOnlyFileSystem,
+    BadFileName,
+    UnableToCreateSymLink,
+} || std.Uri.ParseError || Client.RequestError || Client.Request.WaitError || File.OpenError || Client.Request.ReadError || File.WriteError || File.ReadError || File.SeekError || std.fs.Dir.DeleteFileError;
 
 const JsonResponse = struct {
     body: [100 * 1024]u8,
@@ -67,19 +94,37 @@ pub fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(
     const tarball_dw_filename = try std.mem.concat(alloc, u8, &[_][]const u8{ "zig-" ++ dw_target ++ "-", release_string, ".tar.xz.partial" });
 
     const cwd = std.fs.cwd();
-    var tarball_file = cwd.openFile(tarball_dw_filename, .{});
-    if (tarball_file == File.OpenError.FileNotFound) {
-        const tarball = try cwd.createFile(tarball_dw_filename, .{});
+    var try_tarball_file = cwd.openFile(tarball_dw_filename, .{});
+    if (try_tarball_file == File.OpenError.FileNotFound) {
+        var tarball = try cwd.createFile(tarball_dw_filename, .{});
         defer tarball.close();
-        const tarball_writer = tarball.writer();
-        try download_tarball(client, tarball_url, tarball_writer);
-        tarball_file = cwd.openFile(tarball_dw_filename, .{});
+
+        var tarball_writer = std.io.bufferedWriter(tarball.writer());
+        try download_tarball(client, tarball_url, &tarball_writer);
+        try_tarball_file = cwd.openFile(tarball_dw_filename, .{});
     } else {
         std.log.info("Found already existing tarball, using that", .{});
     }
+
+    const tarball_file = try try_tarball_file;
+    defer tarball_file.close();
+    var tarball_reader = std.io.bufferedReader(tarball_file.reader());
+    const hash_matched = try check_hash(target.object.get("shasum").?.string[0..64], tarball_reader.reader());
+
+    if (!hash_matched) {
+        std.log.err("Hashes do match for downloaded tarball. Exitting (2)", .{});
+        std.process.exit(2);
+    }
+    try tarball_file.seekTo(0);
+
+    std.log.info("Extracting {s}", .{tarball_dw_filename});
+    try extract_xz(alloc, cwd, tarball_reader.reader());
+
+    try cwd.deleteFile(tarball_dw_filename);
 }
 
-fn download_tarball(client: *Client, tb_url: []const u8, tb_writer: std.fs.File.Writer) InstallError!void {
+fn download_tarball(client: *Client, tb_url: []const u8, tb_writer: anytype) InstallError!void {
+    std.log.info("Downloading {s}", .{tb_url});
     const tarball_uri = try std.Uri.parse(tb_url);
 
     var req = make_request(client, tarball_uri);
@@ -101,6 +146,7 @@ fn download_tarball(client: *Client, tb_url: []const u8, tb_writer: std.fs.File.
         }
         _ = try tb_writer.write(buff[0..len]);
     }
+    try tb_writer.flush();
 }
 
 fn get_json_dslist(client: *Client) anyerror!JsonResponse {
@@ -141,7 +187,7 @@ fn make_request(client: *Client, uri: std.Uri) ?Client.Request {
     return null;
 }
 
-fn check_hash(hashstr: *const [64]u8, reader: std.fs.File.Reader) !bool {
+fn check_hash(hashstr: *const [64]u8, reader: anytype) !bool {
     var buff: [1024]u8 = undefined;
 
     var hasher = Sha256.init(.{});
@@ -156,4 +202,9 @@ fn check_hash(hashstr: *const [64]u8, reader: std.fs.File.Reader) !bool {
     var hash: [32]u8 = undefined;
     _ = try std.fmt.hexToBytes(&hash, hashstr);
     return std.mem.eql(u8, &hasher.finalResult(), &hash);
+}
+
+fn extract_xz(alloc: Allocator, dir: std.fs.Dir, reader: anytype) !void {
+    var xz = try std.compress.xz.decompress(alloc, reader);
+    try std.tar.pipeToFileSystem(dir, xz.reader(), .{});
 }
