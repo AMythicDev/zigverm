@@ -7,8 +7,9 @@ const cli = @import("cli.zig");
 const File = std.fs.File;
 const Allocator = std.mem.Allocator;
 const Sha256 = std.crypto.hash.sha2.Sha256;
+const streql = @import("utils.zig").streql;
 
-const Rel = union(enum) { Master, Version: []const u8 };
+const Rel = union(enum) { Master, Stable, Version: []const u8 };
 
 const InstallError = error{
     ReleaseNotFound,
@@ -59,14 +60,17 @@ pub fn main() !void {
             const releases = try json.parseFromSlice(json.Value, alloc, resp.body[0..resp.length], json.ParseOptions{});
             defer releases.deinit();
 
-            if (std.mem.eql(u8, rel, "master")) {
+            if (streql(rel, "master")) {
                 return try install_release(alloc, &client, releases, Rel.Master);
+            } else if (streql(rel, "stable")) {
+                return try install_release(alloc, &client, releases, Rel.Stable);
             } else if (std.SemanticVersion.parse(rel)) |_| {
                 try install_release(alloc, &client, releases, Rel{ .Version = rel });
             } else |_| {
                 return InstallError.InvalidVersion;
             }
         },
+        cli.Cli.Remove => |_| {},
     }
 }
 
@@ -81,6 +85,10 @@ pub fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(
         Rel.Version => |v| {
             release = releases.value.object.get(v) orelse return InstallError.ReleaseNotFound;
             release_string = v;
+        },
+        Rel.Stable => {
+            release_string = find_stable_release(alloc, releases).items;
+            release = releases.value.object.get(release_string).?;
         },
     }
 
@@ -207,4 +215,22 @@ fn check_hash(hashstr: *const [64]u8, reader: anytype) !bool {
 fn extract_xz(alloc: Allocator, dir: std.fs.Dir, reader: anytype) !void {
     var xz = try std.compress.xz.decompress(alloc, reader);
     try std.tar.pipeToFileSystem(dir, xz.reader(), .{});
+}
+
+fn find_stable_release(alloc: Allocator, releases: json.Parsed(json.Value)) std.ArrayList(u8) {
+    var buf = std.ArrayList(u8).init(alloc);
+    var stable: ?std.SemanticVersion = null;
+    for (releases.value.object.keys()) |release| {
+        if (streql(release, "master")) continue;
+        var r = std.SemanticVersion.parse(release) catch unreachable;
+        if (stable == null) {
+            stable = r;
+            continue;
+        }
+        if (r.order(stable.?) == std.math.Order.gt) {
+            stable = r;
+        }
+    }
+    stable.?.format("", .{}, buf.writer()) catch unreachable;
+    return buf;
 }
