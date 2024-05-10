@@ -53,12 +53,10 @@ pub fn main() !void {
 
     switch (command) {
         cli.Cli.Install => |rel| {
-            defer alloc.free(rel);
             var client = Client{ .allocator = alloc };
             defer client.deinit();
             const resp = try get_json_dslist(&client);
             const releases = try json.parseFromSlice(json.Value, alloc, resp.body[0..resp.length], json.ParseOptions{});
-            defer releases.deinit();
 
             if (streql(rel, "master")) {
                 return try install_release(alloc, &client, releases, Rel.Master);
