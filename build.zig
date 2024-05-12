@@ -22,7 +22,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    if (target.result.os.tag == std.Target.Os.Tag.linux) {
+    const ostag = target.result.os.tag;
+    if (ostag.isBSD() or ostag.isDarwin() or ostag == std.Target.Os.Tag.linux) {
         exe.linkLibC();
     }
 

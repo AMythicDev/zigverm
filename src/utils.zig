@@ -3,17 +3,19 @@ const Allocator = std.mem.Allocator;
 const builtin = @import("builtin");
 const OsTag = std.Target.Os.Tag;
 
+const os = builtin.target.os.tag;
+
+pub extern "c" fn getuid() u32;
+
 pub fn streql(cmd: []const u8, key: []const u8) bool {
     return std.mem.eql(u8, cmd, key);
 }
 
 pub fn home_dir(alloc: Allocator) ![]const u8 {
-    const os = builtin.target.os.tag;
-
     if (os == OsTag.windows) {
         if (std.process.getEnvVarOwned(alloc, "USERPROFILE")) |val| {
             return val;
-        } else {
+        } else |_| {
             var buff = std.ArrayList(u8).init(alloc);
             try buff.appendSlice(try std.process.getEnvVarOwned(alloc, "HOMEDRIVE"));
             try buff.appendSlice(try std.process.getEnvVarOwned(alloc, "HOMEPATH"));
@@ -25,14 +27,12 @@ pub fn home_dir(alloc: Allocator) ![]const u8 {
         if (std.process.getEnvVarOwned(alloc, "HOME")) |val| {
             return val;
         } else |_| {
-            const getpwid = std.c.getpwuid;
             switch (os) {
-                OsTag.linux => {
-                    const getuid = std.os.linux.getuid;
-                    return std.mem.span(getpwid(getuid()).?.pw_dir.?);
+                OsTag.linux, OsTag.openbsd => {
+                    return std.mem.span(std.c.getpwuid(getuid()).?.pw_dir.?);
                 },
-                _ => {
-                    @panic("Os not supported");
+                else => {
+                    @panic("Cannot determine home directory");
                 },
             }
         }
