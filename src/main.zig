@@ -10,7 +10,52 @@ const Sha256 = std.crypto.hash.sha2.Sha256;
 const utils = @import("utils.zig");
 const streql = utils.streql;
 
-const Rel = union(enum) { Master, Stable, Version: []const u8 };
+pub const Rel = union(enum) {
+    Master,
+    Stable: []const u8,
+    Version: []const u8,
+
+    const Self = @This();
+
+    pub fn as_string(self: Self) []const u8 {
+        switch (self) {
+            Rel.Master => return "master",
+            Rel.Version, Rel.Stable => |v| return v,
+        }
+    }
+
+    fn resolve_stable_release(alloc: Allocator, releases: json.Parsed(json.Value)) std.ArrayList(u8) {
+        var buf = std.ArrayList(u8).init(alloc);
+        var stable: ?std.SemanticVersion = null;
+        for (releases.value.object.keys()) |release| {
+            if (streql(release, "master")) continue;
+            var r = std.SemanticVersion.parse(release) catch unreachable;
+            if (stable == null) {
+                stable = r;
+                continue;
+            }
+            if (r.order(stable.?) == std.math.Order.gt) {
+                stable = r;
+            }
+        }
+        stable.?.format("", .{}, buf.writer()) catch unreachable;
+        return buf;
+    }
+
+    fn releasefromVersion(alloc: Allocator, releases: json.Parsed(json.Value), version: []const u8) InstallError!Self {
+        var rel: Rel = undefined;
+        if (streql(version, "master")) {
+            rel = Rel.Master;
+        } else if (streql(version, "stable")) {
+            rel = Rel{ .Stable = Rel.resolve_stable_release(alloc, releases).items };
+        } else if (std.SemanticVersion.parse(version)) |_| {
+            rel = Rel{ .Version = version };
+        } else |_| {
+            return InstallError.InvalidVersion;
+        }
+        return rel;
+    }
+};
 
 const InstallError = error{
     ReleaseNotFound,
@@ -23,6 +68,32 @@ const JsonResponse = struct {
     length: usize,
 };
 
+const CommonDirs = struct {
+    zigvm_root: std.fs.Dir,
+    install_dir: std.fs.Dir,
+    download_dir: std.fs.Dir,
+
+    fn resolve_dirs(alloc: Allocator) !@This() {
+        const zigvm_root = try std.fs.openDirAbsolute(try zigvm_dir(alloc), .{});
+        return CommonDirs{
+            .zigvm_root = zigvm_root,
+            .install_dir = try zigvm_root.openDir("installs/", .{}),
+            .download_dir = try zigvm_root.openDir("downloads/", .{}),
+        };
+    }
+
+    fn zigvm_dir(alloc: Allocator) ![]const u8 {
+        if (std.process.getEnvVarOwned(alloc, "ZIGVM_INSTALL_DIR")) |val| {
+            return val;
+        } else |_| {
+            var buff = std.ArrayList(u8).init(alloc);
+            try buff.appendSlice(try utils.home_dir(alloc));
+            try buff.appendSlice("/.zigvm");
+            return buff.items;
+        }
+    }
+};
+
 pub fn main() !void {
     var aa = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     const alloc = aa.allocator();
@@ -30,62 +101,37 @@ pub fn main() !void {
     const command = try cli.read_args(alloc);
 
     switch (command) {
-        cli.Cli.Install => |rel| {
+        cli.Cli.Install => |version| {
             var client = Client{ .allocator = alloc };
             defer client.deinit();
             const resp = try get_json_dslist(&client);
             const releases = try json.parseFromSlice(json.Value, alloc, resp.body[0..resp.length], json.ParseOptions{});
 
-            if (streql(rel, "master")) {
-                return try install_release(alloc, &client, releases, Rel.Master);
-            } else if (streql(rel, "stable")) {
-                return try install_release(alloc, &client, releases, Rel.Stable);
-            } else if (std.SemanticVersion.parse(rel)) |_| {
-                try install_release(alloc, &client, releases, Rel{ .Version = rel });
-            } else |_| {
-                return InstallError.InvalidVersion;
-            }
+            const dirs = try CommonDirs.resolve_dirs(alloc);
+
+            const rel = try Rel.releasefromVersion(alloc, releases, version);
+            try install_release(alloc, &client, releases, rel, dirs);
         },
         cli.Cli.Remove => |_| {},
     }
 }
 
-pub fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(json.Value), rel: Rel) !void {
-    var release: json.Value = undefined;
-    var release_string: []const u8 = undefined;
-    switch (rel) {
-        Rel.Master => {
-            release = releases.value.object.get("master").?;
-            release_string = "master";
-        },
-        Rel.Version => |v| {
-            release = releases.value.object.get(v) orelse return InstallError.ReleaseNotFound;
-            release_string = v;
-        },
-        Rel.Stable => {
-            release_string = find_stable_release(alloc, releases).items;
-            release = releases.value.object.get(release_string).?;
-        },
-    }
+pub fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(json.Value), rel: Rel, dirs: CommonDirs) !void {
+    var release: json.Value = releases.value.object.get(rel.as_string()).?;
 
-    const os = builtin.target.os.tag;
-    const arch = builtin.target.cpu.arch;
-
-    const dw_target = @tagName(arch) ++ "-" ++ @tagName(os);
-    const target = release.object.get(dw_target) orelse return InstallError.TargetNotAvailable;
+    const target = release.object.get(utils.make_target_name()) orelse return InstallError.TargetNotAvailable;
     const tarball_url = target.object.get("tarball").?.string;
 
-    const tarball_dw_filename = try std.mem.concat(alloc, u8, &[_][]const u8{ "zig-" ++ dw_target ++ "-", release_string, ".tar.xz.partial" });
+    const tarball_dw_filename = try utils.make_release_name(alloc, rel);
+    var try_tarball_file = dirs.download_dir.openFile(tarball_dw_filename, .{});
 
-    const workdir = try std.fs.openDirAbsolute(try install_dir(alloc), .{});
-    var try_tarball_file = workdir.openFile(tarball_dw_filename, .{});
     if (try_tarball_file == File.OpenError.FileNotFound) {
-        var tarball = try workdir.createFile(tarball_dw_filename, .{});
+        var tarball = try dirs.download_dir.createFile(tarball_dw_filename, .{});
         defer tarball.close();
 
         var tarball_writer = std.io.bufferedWriter(tarball.writer());
         try download_tarball(client, tarball_url, &tarball_writer);
-        try_tarball_file = workdir.openFile(tarball_dw_filename, .{});
+        try_tarball_file = dirs.download_dir.openFile(tarball_dw_filename, .{});
     } else {
         std.log.info("Found already existing tarball, using that", .{});
     }
@@ -97,15 +143,19 @@ pub fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(
 
     if (!hash_matched) {
         std.log.err("Hashes do match for downloaded tarball. Exitting (2)", .{});
-        std.process.exit(2);
+        return error.BadChecksum;
     }
     try tarball_file.seekTo(0);
 
     std.log.info("Extracting {s}", .{tarball_dw_filename});
-    try extract_xz(alloc, workdir, tarball_reader.reader());
+    try extract_xz(alloc, dirs.install_dir, tarball_reader.reader());
 
-    try workdir.deleteFile(tarball_dw_filename);
+    try dirs.download_dir.deleteFile(tarball_dw_filename);
 }
+
+// fn remove_release() {
+//
+// }
 
 fn download_tarball(client: *Client, tb_url: []const u8, tb_writer: anytype) !void {
     std.log.info("Downloading {s}", .{tb_url});
@@ -191,33 +241,4 @@ fn check_hash(hashstr: *const [64]u8, reader: anytype) !bool {
 fn extract_xz(alloc: Allocator, dir: std.fs.Dir, reader: anytype) !void {
     var xz = try std.compress.xz.decompress(alloc, reader);
     try std.tar.pipeToFileSystem(dir, xz.reader(), .{});
-}
-
-fn find_stable_release(alloc: Allocator, releases: json.Parsed(json.Value)) std.ArrayList(u8) {
-    var buf = std.ArrayList(u8).init(alloc);
-    var stable: ?std.SemanticVersion = null;
-    for (releases.value.object.keys()) |release| {
-        if (streql(release, "master")) continue;
-        var r = std.SemanticVersion.parse(release) catch unreachable;
-        if (stable == null) {
-            stable = r;
-            continue;
-        }
-        if (r.order(stable.?) == std.math.Order.gt) {
-            stable = r;
-        }
-    }
-    stable.?.format("", .{}, buf.writer()) catch unreachable;
-    return buf;
-}
-
-fn install_dir(alloc: Allocator) ![]const u8 {
-    if (std.process.getEnvVarOwned(alloc, "ZIGVM_INSTALL_DIR")) |val| {
-        return val;
-    } else |_| {
-        var buff = std.ArrayList(u8).init(alloc);
-        try buff.appendSlice(try utils.home_dir(alloc));
-        try buff.appendSlice("/.zigvm");
-        return buff.items;
-    }
 }

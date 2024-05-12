@@ -2,8 +2,10 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const builtin = @import("builtin");
 const OsTag = std.Target.Os.Tag;
+const Rel = @import("main.zig").Rel;
 
 const os = builtin.target.os.tag;
+const arch = builtin.target.cpu.arch;
 
 pub extern "c" fn getuid() u32;
 
@@ -37,4 +39,14 @@ pub fn home_dir(alloc: Allocator) ![]const u8 {
             }
         }
     }
+}
+
+pub fn make_target_name() []const u8 {
+    return @tagName(arch) ++ "-" ++ @tagName(os);
+}
+
+pub fn make_release_name(alloc: Allocator, rel: Rel) ![]const u8 {
+    const release_string = rel.as_string();
+    const dw_target = @tagName(arch) ++ "-" ++ @tagName(os);
+    return try std.mem.concat(alloc, u8, &[_][]const u8{ "zig-" ++ dw_target ++ "-", release_string, ".tar.xz.partial" });
 }
