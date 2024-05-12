@@ -7,7 +7,8 @@ const cli = @import("cli.zig");
 const File = std.fs.File;
 const Allocator = std.mem.Allocator;
 const Sha256 = std.crypto.hash.sha2.Sha256;
-const streql = @import("utils.zig").streql;
+const utils = @import("utils.zig");
+const streql = utils.streql;
 
 const Rel = union(enum) { Master, Stable, Version: []const u8 };
 
@@ -15,30 +16,7 @@ const InstallError = error{
     ReleaseNotFound,
     InvalidVersion,
     TargetNotAvailable,
-    InvalidLength,
-    CorruptInput,
-    WrongChecksum,
-    BadHeader,
-    EndOfStreamWithNoError,
-    Unsupported,
-    UnexpectedEndOfStream,
-    TarHeader,
-    TarHeaderChksum,
-    TarNumericValueNegative,
-    TarNumericValueTooBig,
-    TarInsufficientBuffer,
-    StreamTooLong,
-    PaxNullInKeyword,
-    PaxInvalidAttributeEnd,
-    PaxSizeAttrOverflow,
-    PaxNullInValue,
-    TarHeadersTooBig,
-    TarUnsupportedHeader,
-    LinkQuotaExceeded,
-    ReadOnlyFileSystem,
-    BadFileName,
-    UnableToCreateSymLink,
-} || std.Uri.ParseError || Client.RequestError || Client.Request.WaitError || File.OpenError || Client.Request.ReadError || File.WriteError || File.ReadError || File.SeekError || std.fs.Dir.DeleteFileError;
+};
 
 const JsonResponse = struct {
     body: [100 * 1024]u8,
@@ -72,7 +50,7 @@ pub fn main() !void {
     }
 }
 
-pub fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(json.Value), rel: Rel) InstallError!void {
+pub fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(json.Value), rel: Rel) !void {
     var release: json.Value = undefined;
     var release_string: []const u8 = undefined;
     switch (rel) {
@@ -99,15 +77,15 @@ pub fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(
 
     const tarball_dw_filename = try std.mem.concat(alloc, u8, &[_][]const u8{ "zig-" ++ dw_target ++ "-", release_string, ".tar.xz.partial" });
 
-    const cwd = std.fs.cwd();
-    var try_tarball_file = cwd.openFile(tarball_dw_filename, .{});
+    const workdir = try std.fs.openDirAbsolute(try install_dir(alloc), .{});
+    var try_tarball_file = workdir.openFile(tarball_dw_filename, .{});
     if (try_tarball_file == File.OpenError.FileNotFound) {
-        var tarball = try cwd.createFile(tarball_dw_filename, .{});
+        var tarball = try workdir.createFile(tarball_dw_filename, .{});
         defer tarball.close();
 
         var tarball_writer = std.io.bufferedWriter(tarball.writer());
         try download_tarball(client, tarball_url, &tarball_writer);
-        try_tarball_file = cwd.openFile(tarball_dw_filename, .{});
+        try_tarball_file = workdir.openFile(tarball_dw_filename, .{});
     } else {
         std.log.info("Found already existing tarball, using that", .{});
     }
@@ -124,12 +102,12 @@ pub fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(
     try tarball_file.seekTo(0);
 
     std.log.info("Extracting {s}", .{tarball_dw_filename});
-    try extract_xz(alloc, cwd, tarball_reader.reader());
+    try extract_xz(alloc, workdir, tarball_reader.reader());
 
-    try cwd.deleteFile(tarball_dw_filename);
+    try workdir.deleteFile(tarball_dw_filename);
 }
 
-fn download_tarball(client: *Client, tb_url: []const u8, tb_writer: anytype) InstallError!void {
+fn download_tarball(client: *Client, tb_url: []const u8, tb_writer: anytype) !void {
     std.log.info("Downloading {s}", .{tb_url});
     const tarball_uri = try std.Uri.parse(tb_url);
 
@@ -231,4 +209,15 @@ fn find_stable_release(alloc: Allocator, releases: json.Parsed(json.Value)) std.
     }
     stable.?.format("", .{}, buf.writer()) catch unreachable;
     return buf;
+}
+
+fn install_dir(alloc: Allocator) ![]const u8 {
+    if (std.process.getEnvVarOwned(alloc, "ZIGVM_INSTALL_DIR")) |val| {
+        return val;
+    } else |_| {
+        var buff = std.ArrayList(u8).init(alloc);
+        try buff.appendSlice(try utils.home_dir(alloc));
+        try buff.appendSlice("/.zigvm");
+        return buff.items;
+    }
 }
