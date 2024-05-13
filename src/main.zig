@@ -6,21 +6,36 @@ const builtin = @import("builtin");
 const cli = @import("cli.zig");
 const File = std.fs.File;
 const Allocator = std.mem.Allocator;
-const Sha256 = std.crypto.hash.sha2.Sha256;
 const utils = @import("utils.zig");
 const streql = utils.streql;
+const CommonDirs = utils.CommonDirs;
 
 pub const Rel = union(enum) {
     Master,
-    Stable: []const u8,
+    Stable: ?[]const u8,
     Version: []const u8,
 
     const Self = @This();
 
+    pub fn version(self: Self) []const u8 {
+        switch (self) {
+            Rel.Master => return "master",
+            Rel.Stable => |ver| {
+                if (ver) |v| {
+                    return v;
+                } else {
+                    @panic("Rel.version*() called when Rel.Stable is not resolved");
+                }
+            },
+            Rel.Version => |v| return v,
+        }
+    }
+
     pub fn as_string(self: Self) []const u8 {
         switch (self) {
             Rel.Master => return "master",
-            Rel.Version, Rel.Stable => |v| return v,
+            Rel.Version => |v| return v,
+            Rel.Stable => return "stable",
         }
     }
 
@@ -42,14 +57,18 @@ pub const Rel = union(enum) {
         return buf;
     }
 
-    fn releasefromVersion(alloc: Allocator, releases: json.Parsed(json.Value), version: []const u8) InstallError!Self {
+    fn releasefromVersion(alloc: Allocator, releases: ?json.Parsed(json.Value), v: []const u8) InstallError!Self {
         var rel: Rel = undefined;
-        if (streql(version, "master")) {
+        if (streql(v, "master")) {
             rel = Rel.Master;
-        } else if (streql(version, "stable")) {
-            rel = Rel{ .Stable = Rel.resolve_stable_release(alloc, releases).items };
-        } else if (std.SemanticVersion.parse(version)) |_| {
-            rel = Rel{ .Version = version };
+        } else if (streql(v, "stable")) {
+            if (releases) |r| {
+                rel = Rel{ .Stable = Rel.resolve_stable_release(alloc, r).items };
+            } else {
+                rel = Rel{ .Stable = null };
+            }
+        } else if (std.SemanticVersion.parse(v)) |_| {
+            rel = Rel{ .Version = v };
         } else |_| {
             return InstallError.InvalidVersion;
         }
@@ -68,32 +87,6 @@ const JsonResponse = struct {
     length: usize,
 };
 
-const CommonDirs = struct {
-    zigvm_root: std.fs.Dir,
-    install_dir: std.fs.Dir,
-    download_dir: std.fs.Dir,
-
-    fn resolve_dirs(alloc: Allocator) !@This() {
-        const zigvm_root = try std.fs.openDirAbsolute(try zigvm_dir(alloc), .{});
-        return CommonDirs{
-            .zigvm_root = zigvm_root,
-            .install_dir = try zigvm_root.openDir("installs/", .{}),
-            .download_dir = try zigvm_root.openDir("downloads/", .{}),
-        };
-    }
-
-    fn zigvm_dir(alloc: Allocator) ![]const u8 {
-        if (std.process.getEnvVarOwned(alloc, "ZIGVM_INSTALL_DIR")) |val| {
-            return val;
-        } else |_| {
-            var buff = std.ArrayList(u8).init(alloc);
-            try buff.appendSlice(try utils.home_dir(alloc));
-            try buff.appendSlice("/.zigvm");
-            return buff.items;
-        }
-    }
-};
-
 pub fn main() !void {
     var aa = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     const alloc = aa.allocator();
@@ -104,25 +97,35 @@ pub fn main() !void {
         cli.Cli.Install => |version| {
             var client = Client{ .allocator = alloc };
             defer client.deinit();
-            const resp = try get_json_dslist(&client);
-            const releases = try json.parseFromSlice(json.Value, alloc, resp.body[0..resp.length], json.ParseOptions{});
 
             const dirs = try CommonDirs.resolve_dirs(alloc);
 
+            if (!(try utils.check_not_installed(alloc, try Rel.releasefromVersion(alloc, null, version), dirs))) {
+                std.log.err("Version already installled. Quitting", .{});
+                std.process.exit(0);
+            }
+
+            const resp = try get_json_dslist(&client);
+            const releases = try json.parseFromSlice(json.Value, alloc, resp.body[0..resp.length], json.ParseOptions{});
             const rel = try Rel.releasefromVersion(alloc, releases, version);
+
             try install_release(alloc, &client, releases, rel, dirs);
         },
-        cli.Cli.Remove => |_| {},
+        cli.Cli.Remove => |version| {
+            const dirs = try CommonDirs.resolve_dirs(alloc);
+            const rel = try Rel.releasefromVersion(alloc, null, version);
+            try remove_release(alloc, rel, dirs);
+        },
     }
 }
 
 pub fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(json.Value), rel: Rel, dirs: CommonDirs) !void {
-    var release: json.Value = releases.value.object.get(rel.as_string()).?;
+    var release: json.Value = releases.value.object.get(rel.version()).?;
 
-    const target = release.object.get(utils.make_target_name()) orelse return InstallError.TargetNotAvailable;
+    const target = release.object.get(utils.target_name()) orelse return InstallError.TargetNotAvailable;
     const tarball_url = target.object.get("tarball").?.string;
 
-    const tarball_dw_filename = try utils.make_release_name(alloc, rel);
+    const tarball_dw_filename = try utils.dw_tarball_name(alloc, rel);
     var try_tarball_file = dirs.download_dir.openFile(tarball_dw_filename, .{});
 
     if (try_tarball_file == File.OpenError.FileNotFound) {
@@ -139,7 +142,7 @@ pub fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(
     const tarball_file = try try_tarball_file;
     defer tarball_file.close();
     var tarball_reader = std.io.bufferedReader(tarball_file.reader());
-    const hash_matched = try check_hash(target.object.get("shasum").?.string[0..64], tarball_reader.reader());
+    const hash_matched = try utils.check_hash(target.object.get("shasum").?.string[0..64], tarball_reader.reader());
 
     if (!hash_matched) {
         std.log.err("Hashes do match for downloaded tarball. Exitting (2)", .{});
@@ -148,14 +151,20 @@ pub fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(
     try tarball_file.seekTo(0);
 
     std.log.info("Extracting {s}", .{tarball_dw_filename});
-    try extract_xz(alloc, dirs.install_dir, tarball_reader.reader());
+    try utils.extract_xz(alloc, dirs, rel, tarball_reader.reader());
 
     try dirs.download_dir.deleteFile(tarball_dw_filename);
 }
 
-// fn remove_release() {
-//
-// }
+fn remove_release(alloc: Allocator, rel: Rel, dirs: CommonDirs) !void {
+    if ((try utils.check_not_installed(alloc, rel, dirs))) {
+        std.log.err("Version not installled. Quitting", .{});
+        std.process.exit(0);
+    }
+    const release_dir = try utils.release_name(alloc, rel);
+    try dirs.install_dir.deleteTree(release_dir);
+    std.log.err("Removed {s}", .{release_dir});
+}
 
 fn download_tarball(client: *Client, tb_url: []const u8, tb_writer: anytype) !void {
     std.log.info("Downloading {s}", .{tb_url});
@@ -219,26 +228,4 @@ fn make_request(client: *Client, uri: std.Uri) ?Client.Request {
         }
     }
     return null;
-}
-
-fn check_hash(hashstr: *const [64]u8, reader: anytype) !bool {
-    var buff: [1024]u8 = undefined;
-
-    var hasher = Sha256.init(.{});
-
-    while (true) {
-        const len = try reader.read(&buff);
-        if (len == 0) {
-            break;
-        }
-        hasher.update(buff[0..len]);
-    }
-    var hash: [32]u8 = undefined;
-    _ = try std.fmt.hexToBytes(&hash, hashstr);
-    return std.mem.eql(u8, &hasher.finalResult(), &hash);
-}
-
-fn extract_xz(alloc: Allocator, dir: std.fs.Dir, reader: anytype) !void {
-    var xz = try std.compress.xz.decompress(alloc, reader);
-    try std.tar.pipeToFileSystem(dir, xz.reader(), .{});
 }
