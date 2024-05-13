@@ -10,8 +10,9 @@ const helptext =
     \\Commands:
     \\      install <version>    Install a specific version. Version can be any valid semantic version
     \\                           or master or stable
-    \\      remove <version>     Removes a already installed specific version. Version can be any 
+    \\      remove <version>     Remove a already installed specific version. Version can be any 
     \\                           valid semantic version or master or stable
+    \\      info                 Show information about installations
     \\    
     \\Options:
     \\      -h  --help           Show this help message
@@ -19,8 +20,9 @@ const helptext =
 ;
 
 pub const Cli = union(enum) {
-    Install: []const u8,
-    Remove: []const u8,
+    install: []const u8,
+    remove: []const u8,
+    show,
 };
 
 pub fn read_args(alloc: Allocator) anyerror!Cli {
@@ -45,10 +47,12 @@ pub fn read_args(alloc: Allocator) anyerror!Cli {
 
     if (streql(cmd, "install")) {
         const rel = arg_iter.next().?;
-        command = Cli{ .Install = try alloc.dupe(u8, rel) };
+        command = Cli{ .install = try alloc.dupe(u8, rel) };
     } else if (streql(cmd, "remove")) {
         const rel = arg_iter.next().?;
-        command = Cli{ .Remove = try alloc.dupe(u8, rel) };
+        command = Cli{ .remove = try alloc.dupe(u8, rel) };
+    } else if (streql(cmd, "info")) {
+        command = Cli.show;
     } else if (streql(cmd, "-h") or streql(cmd, "--help")) {
         std.debug.print("{s}\n", .{helptext});
         std.process.exit(0);

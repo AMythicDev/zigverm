@@ -94,7 +94,7 @@ pub fn main() !void {
     const command = try cli.read_args(alloc);
 
     switch (command) {
-        cli.Cli.Install => |version| {
+        cli.Cli.install => |version| {
             var client = Client{ .allocator = alloc };
             defer client.deinit();
 
@@ -111,10 +111,14 @@ pub fn main() !void {
 
             try install_release(alloc, &client, releases, rel, dirs);
         },
-        cli.Cli.Remove => |version| {
+        cli.Cli.remove => |version| {
             const dirs = try CommonDirs.resolve_dirs(alloc);
             const rel = try Rel.releasefromVersion(alloc, null, version);
             try remove_release(alloc, rel, dirs);
+        },
+        cli.Cli.show => {
+            const dirs = try CommonDirs.resolve_dirs(alloc);
+            try show_info(dirs);
         },
     }
 }
@@ -228,4 +232,17 @@ fn make_request(client: *Client, uri: std.Uri) ?Client.Request {
         }
     }
     return null;
+}
+
+fn show_info(dirs: CommonDirs) !void {
+    std.debug.print("zigvm root:\t{s}\n\n", .{CommonDirs.get_zigvm_root()});
+    var iter = dirs.install_dir.iterate();
+
+    std.debug.print("Installed releases:\n\n", .{});
+
+    var n: u8 = 1;
+    while (try iter.next()) |i| {
+        std.debug.print("{d}.  {s}\n", .{ n, i.name });
+        n += 1;
+    }
 }

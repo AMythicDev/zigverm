@@ -15,12 +15,15 @@ pub const CommonDirs = struct {
     install_dir: std.fs.Dir,
     download_dir: std.fs.Dir,
 
+    var zigvm_root_path: []const u8 = undefined;
+
     pub fn resolve_dirs(alloc: Allocator) !@This() {
-        const zigvm_root = try std.fs.openDirAbsolute(try zigvm_dir(alloc), .{});
+        zigvm_root_path = try zigvm_dir(alloc);
+        const zigvm_root = try std.fs.openDirAbsolute(zigvm_root_path, .{});
         return CommonDirs{
             .zigvm_root = zigvm_root,
-            .install_dir = try zigvm_root.openDir("installs/", .{}),
-            .download_dir = try zigvm_root.openDir("downloads/", .{}),
+            .install_dir = try zigvm_root.openDir("installs/", .{ .iterate = true }),
+            .download_dir = try zigvm_root.openDir("downloads/", .{ .iterate = true }),
         };
     }
 
@@ -33,6 +36,10 @@ pub const CommonDirs = struct {
             try buff.appendSlice("/.zigvm");
             return buff.items;
         }
+    }
+
+    pub fn get_zigvm_root() []const u8 {
+        return zigvm_root_path;
     }
 };
 
