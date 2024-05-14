@@ -102,18 +102,14 @@ pub fn check_install_name(name: []const u8) bool {
     if (!is_valid_arch_os(arch, os)) {
         return false;
     }
-    const version = components.next();
-    if (version) |v| {
-        var sv = true;
-        if (std.SemanticVersion.parse(v)) |_| {
-            sv = true;
-        } else |_| {
-            sv = false;
-        }
-        if (!streql(v, "stable") and !streql(v, "master") and !sv) {
-            return false;
-        }
-    } else {
+    const version = components.next() orelse return false;
+    var sv = true;
+    if (std.SemanticVersion.parse(version)) |_| {
+        sv = true;
+    } else |_| {
+        sv = false;
+    }
+    if (!streql(version, "stable") and !streql(version, "master") and !sv) {
         return false;
     }
 
