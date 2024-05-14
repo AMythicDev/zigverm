@@ -5,8 +5,8 @@ const OsTag = std.Target.Os.Tag;
 const Rel = @import("main.zig").Rel;
 const Sha256 = std.crypto.hash.sha2.Sha256;
 
-const os = builtin.target.os.tag;
-const arch = builtin.target.cpu.arch;
+const default_os = builtin.target.os.tag;
+const default_arch = builtin.target.cpu.arch;
 
 pub extern "c" fn getuid() u32;
 
@@ -48,7 +48,7 @@ pub fn streql(cmd: []const u8, key: []const u8) bool {
 }
 
 pub fn home_dir(alloc: Allocator) ![]const u8 {
-    if (os == OsTag.windows) {
+    if (default_os == OsTag.windows) {
         if (std.process.getEnvVarOwned(alloc, "USERPROFILE")) |val| {
             return val;
         } else |_| {
@@ -59,11 +59,11 @@ pub fn home_dir(alloc: Allocator) ![]const u8 {
         }
     }
 
-    if (os.isBSD() or os.isDarwin() or os == OsTag.linux) {
+    if (default_os.isBSD() or default_os.isDarwin() or default_os == OsTag.linux) {
         if (std.process.getEnvVarOwned(alloc, "HOME")) |val| {
             return val;
         } else |_| {
-            switch (os) {
+            switch (default_os) {
                 OsTag.linux, OsTag.openbsd => {
                     return std.mem.span(std.c.getpwuid(getuid()).?.pw_dir.?);
                 },
@@ -76,7 +76,7 @@ pub fn home_dir(alloc: Allocator) ![]const u8 {
 }
 
 pub fn target_name() []const u8 {
-    return @tagName(arch) ++ "-" ++ @tagName(os);
+    return @tagName(default_arch) ++ "-" ++ @tagName(default_os);
 }
 
 pub fn dw_tarball_name(alloc: Allocator, rel: Rel) ![]const u8 {
@@ -89,6 +89,72 @@ pub fn release_name(alloc: Allocator, rel: Rel) ![]const u8 {
     const release_string = rel.as_string();
     const dw_target = comptime target_name();
     return try std.mem.concat(alloc, u8, &[_][]const u8{ "zig-" ++ dw_target ++ "-", release_string });
+}
+
+pub fn check_install_name(name: []const u8) bool {
+    if (!std.mem.startsWith(u8, name, "zig-")) {
+        return false;
+    }
+    var components = std.mem.split(u8, name[4..], "-");
+
+    const arch = components.next();
+    const os = components.next();
+    if (!is_valid_arch_os(arch, os)) {
+        return false;
+    }
+    const version = components.next();
+    if (version) |v| {
+        var sv = true;
+        if (std.SemanticVersion.parse(v)) |_| {
+            sv = true;
+        } else |_| {
+            sv = false;
+        }
+        if (!streql(v, "stable") and !streql(v, "master") and !sv) {
+            return false;
+        }
+    } else {
+        return false;
+    }
+
+    return true;
+}
+
+pub fn is_valid_arch_os(arch: ?[]const u8, os: ?[]const u8) bool {
+    const arch_fields = @typeInfo(std.Target.Cpu.Arch).Enum.fields;
+    comptime var archs: [arch_fields.len][]const u8 = undefined;
+    comptime {
+        for (arch_fields, 0..) |a, i| {
+            archs[i] = a.name;
+        }
+    }
+    const osfields = @typeInfo(std.Target.Os.Tag).Enum.fields;
+    comptime var oses: [osfields.len][]const u8 = undefined;
+    comptime {
+        for (osfields, 0..) |o, i| {
+            oses[i] = o.name;
+        }
+    }
+
+    var result = false;
+    if (arch) |a| {
+        for (archs) |as| {
+            if (streql(as, a)) {
+                result = true;
+                break;
+            }
+        }
+    }
+    if (os) |o| {
+        for (oses) |t| {
+            if (streql(o, t)) {
+                result = true;
+                break;
+            }
+        }
+    }
+
+    return result;
 }
 
 pub fn check_hash(hashstr: *const [64]u8, reader: anytype) !bool {

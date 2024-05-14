@@ -57,7 +57,7 @@ pub const Rel = union(enum) {
         return buf;
     }
 
-    fn releasefromVersion(alloc: Allocator, releases: ?json.Parsed(json.Value), v: []const u8) InstallError!Self {
+    pub fn releasefromVersion(alloc: Allocator, releases: ?json.Parsed(json.Value), v: []const u8) InstallError!Self {
         var rel: Rel = undefined;
         if (streql(v, "master")) {
             rel = Rel.Master;
@@ -242,6 +242,9 @@ fn show_info(dirs: CommonDirs) !void {
 
     var n: u8 = 1;
     while (try iter.next()) |i| {
+        if (!utils.check_install_name(i.name)) {
+            continue;
+        }
         std.debug.print("{d}.  {s}\n", .{ n, i.name });
         n += 1;
     }
