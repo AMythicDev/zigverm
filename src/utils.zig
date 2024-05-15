@@ -103,12 +103,7 @@ pub fn check_install_name(name: []const u8) bool {
         return false;
     }
     const version = components.next() orelse return false;
-    var sv = true;
-    if (std.SemanticVersion.parse(version)) |_| {
-        sv = true;
-    } else |_| {
-        sv = false;
-    }
+    const sv = if (std.SemanticVersion.parse(version)) |_| true else |_| false;
     if (!streql(version, "stable") and !streql(version, "master") and !sv) {
         return false;
     }
