@@ -28,7 +28,7 @@ pub const CommonDirs = struct {
     }
 
     fn zigvm_dir(alloc: Allocator) ![]const u8 {
-        if (std.process.getEnvVarOwned(alloc, "ZIGVM_INSTALL_DIR")) |val| {
+        if (std.process.getEnvVarOwned(alloc, "ZIGVM_ROOT_DIR")) |val| {
             return val;
         } else |_| {
             var buff = std.ArrayList(u8).init(alloc);
