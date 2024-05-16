@@ -1,7 +1,7 @@
 # zigvm
-Version manager for the Zig Programming Language
+Version manager for the Zig Programming Language.
 
-`zigvm` lets you install, remove and manage your Zig installation from a central location.
+It lets you install, remove and manage your Zig installation.
 
 **zigvm is in early stages of its development, it can do [basic things](#supported-features) and platform support 
 may not be on par with other version managers. If you encounter issues or want to request a feature
@@ -10,8 +10,8 @@ be sure to drop a issue on the GitHub issue tracker.**
 ## Platform Support
 Legend:  
 🎉 - Binary releases + automatic installer available  
-💪 - binary releases available
-❌ - No binary releases. Compile your own thing
+💪 - binary releases available  
+❌ - No binary releases. Compile for your own thing  
 \- - Not applicable
 
 | OS/Arch | x86_64 | x86 | aarch64 | armv7a | riscv64 |
@@ -51,4 +51,4 @@ a line to your `$HOME/.profile` and `$HOME/.bashrc` or `$HOME/.zshrc` depending 
 - [x] List down installed versions
 
 ## License
-`zigvm` is licensed under the MIT License. See the [LICENSE](./LICENSE) file.
+`zigvm` is licensed under the Apache License 2.0. See the [LICENSE](./LICENSE) file.
