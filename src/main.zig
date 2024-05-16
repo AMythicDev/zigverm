@@ -149,7 +149,7 @@ pub fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(
     const hash_matched = try utils.check_hash(target.object.get("shasum").?.string[0..64], tarball_reader.reader());
 
     if (!hash_matched) {
-        std.log.err("Hashes do match for downloaded tarball. Exitting (2)", .{});
+        std.log.err("Hashes do match for downloaded tarball. Exitting", .{});
         return error.BadChecksum;
     }
     try tarball_file.seekTo(0);

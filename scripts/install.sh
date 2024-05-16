@@ -23,16 +23,17 @@ DEFAULT_SHELL=$(getent passwd arijit | awk -F: '{ print($NF) } ' | awk -F/ '{ pr
 
 case DEFAULT_SHELL in
   "bash")
-    echo 'export PATH=$PATH:'$ZIGVM_ROOT_DIR/bin/ >> $HOME/.bashrc
+    echo 'export PATH=$PATH:'$ZIGVM_ROOT_DIR/bin >> $HOME/.bashrc
     ;;
   "zsh")
-    echo 'export PATH=$PATH:'$ZIGVM_ROOT_DIR/bin/ >> $HOME/.zshrc
+    echo 'export PATH=$PATH:'$ZIGVM_ROOT_DIR/bin >> $HOME/.zshrc
     ;;
   *)
     echo "Cannot write to shell rc file. Unknown shell" 1>&2;
+    echo "You need to manually add {$ZIGVM_ROOT_DIR}/bin to ensure zigvm can be called from anywhere."
 esac
 
 echo 'export PATH=$PATH:'$ZIGVM_ROOT_DIR/bin/ >> $HOME/.profile
 
-echo "zigvm installed successfully"
+echo "\033[0;33;1mzigvm installed successfully"
 echo "Please restart your terminal for changes to take effect."
