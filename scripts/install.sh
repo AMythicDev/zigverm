@@ -28,6 +28,9 @@ case DEFAULT_SHELL in
   "zsh")
     echo 'export PATH=$PATH:'$ZIGVM_ROOT_DIR/bin >> $HOME/.zshrc
     ;;
+  "fish")
+    echo 'set -x PATH=$PATH:'$ZIGVM_ROOT_DIR/bin >> ${XDG_CONFIG_HOME:-$HOME/.config}/fish/config.fish
+    ;;
   *)
     echo "Cannot write to shell rc file. Unknown shell" 1>&2;
     echo "You need to manually add {$ZIGVM_ROOT_DIR}/bin to ensure zigvm can be called from anywhere."
