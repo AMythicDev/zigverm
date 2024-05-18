@@ -45,6 +45,24 @@ a line to your `$HOME/.profile` and `$HOME/.bashrc` or `$HOME/.zshrc` depending 
 ```
 * Download the latest release for Windows from GitHub, rename it to `zigvm.exe` and put it in the `bin` directory.
 
+### Compiling
+Requirements:  
+- Although `zigvm` can manage all verions of Zig, it itself requires Zig >= 0.12.0 to compile.
+- It also depemds pm your system libc on non-Windows systems.
+- Also ensure that you have git installed, if you want to compile from the latest commit or you want to develop `zigvm`
+
+Now to compile:
+- Clone the repo or Download source a source archive depending on if you want to compile a release or the latest `main` branck.
+- Extract the archive and change into the extracted directory.
+- Run the following command
+```
+zig build --release=safe
+```
+- If you are devloping `zigvm`, you can omit the `--release=safe` flag.
+- You will have `zigvm` in `zig-out/bin/` directory
+- Copy the executable into a location where it can be accessed easily.
+- Lastly follow the same step 1 [for windows](#for-windows) 
+
 ## Supported Features
 - [x] Install versions (master, stable, x.y.z)
 - [x] Remove versions
