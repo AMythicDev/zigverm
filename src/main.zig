@@ -128,6 +128,7 @@ pub fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(
 
     const target = release.object.get(utils.target_name()) orelse return InstallError.TargetNotAvailable;
     const tarball_url = target.object.get("tarball").?.string;
+    const tarball_size = try std.fmt.parseInt(usize, target.object.get("size").?.string, 10);
 
     const tarball_dw_filename = try utils.dw_tarball_name(alloc, rel);
     var try_tarball_file = dirs.download_dir.openFile(tarball_dw_filename, .{});
@@ -137,7 +138,12 @@ pub fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(
         defer tarball.close();
 
         var tarball_writer = std.io.bufferedWriter(tarball.writer());
-        try download_tarball(client, tarball_url, &tarball_writer);
+        try download_tarball(
+            client,
+            tarball_url,
+            &tarball_writer,
+            tarball_size,
+        );
         try_tarball_file = dirs.download_dir.openFile(tarball_dw_filename, .{});
     } else {
         std.log.info("Found already existing tarball, using that", .{});
@@ -170,7 +176,7 @@ fn remove_release(alloc: Allocator, rel: Rel, dirs: CommonDirs) !void {
     std.log.err("Removed {s}", .{release_dir});
 }
 
-fn download_tarball(client: *Client, tb_url: []const u8, tb_writer: anytype) !void {
+fn download_tarball(client: *Client, tb_url: []const u8, tb_writer: anytype, total_size: usize) !void {
     std.log.info("Downloading {s}", .{tb_url});
     const tarball_uri = try std.Uri.parse(tb_url);
 
@@ -185,14 +191,38 @@ fn download_tarball(client: *Client, tb_url: []const u8, tb_writer: anytype) !vo
     try req.?.wait();
     var reader = req.?.reader();
 
+    var progress_bar: [52]u8 = undefined;
+    progress_bar[0] = '[';
+    for (0..50) |i| {
+        progress_bar[i + 1] = ' ';
+    }
+    progress_bar[51] = ']';
+
     var buff: [1024]u8 = undefined;
+    var dlnow: usize = 0;
+    var bars: u8 = 0;
     while (true) {
         const len = try reader.read(&buff);
         if (len == 0) {
             break;
         }
         _ = try tb_writer.write(buff[0..len]);
+
+        dlnow += len;
+        const pcnt_complete: u8 = @intCast((dlnow * 100 / total_size));
+        var timer = try std.time.Timer.start();
+        const newbars: u8 = pcnt_complete / 2;
+
+        if (newbars > bars) {
+            for (bars..newbars) |i| {
+                progress_bar[i + 1] = '|';
+            }
+            const dlspeed = @as(f64, @floatFromInt(dlnow)) / 1024 * 8 / @as(f64, @floatFromInt(timer.read()));
+            std.debug.print("\r\t{s} {d}% {d:.1}kb/s", .{ progress_bar, pcnt_complete, dlspeed });
+            bars = newbars;
+        }
     }
+    std.debug.print("\n", .{});
     try tb_writer.flush();
 }
 
