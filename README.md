@@ -1,7 +1,7 @@
 # zigvm
 Version manager for the Zig Programming Language.
 
-It lets you install, remove and manage your Zig installation.
+It lets you install and manage your Zig installation.
 
 **zigvm is in early stages of its development, it can do [basic things](#supported-features) and platform support 
 may not be on par with other version managers. If you encounter issues or want to request a feature
@@ -16,7 +16,7 @@ Legend:
 
 | OS/Arch | x86_64 | x86 | aarch64 | armv7a | riscv64 |
 |---------|--------|-----|---------|--------|---------|
-| Windows |   💪   |  💪 |    ❌   |   ❌   |    -    |
+| Windows |   💪   |  💪 |    ❌   |   -    |    -    |
 | Linux   |   🎉   |  🎉 |    🎉   |   ❌   |    ❌   |  
 | MacOS   |   🎉   |  -  |    🎉   |   -    |    -    |
 
