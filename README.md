@@ -47,9 +47,9 @@ a line to your `$HOME/.profile` and `$HOME/.bashrc` or `$HOME/.zshrc` depending 
 
 ### Compiling
 Requirements:  
-- Although `zigvm` can manage all verions of Zig, it itself requires Zig >= 0.12.0 to compile.
+- Although `zigvm` can manage all versions of Zig, it itself requires Zig >= 0.12.0 to compile.
 - It also depemds pm your system libc on non-Windows systems.
-- Also ensure that you have git installed, if you want to compile from the latest commit or you want to develop `zigvm`
+- You should have git installed, if you want to compile from the latest commit or you want to develop `zigvm`
 
 Now to compile:
 - Clone the repo or Download source a source archive depending on if you want to compile a release or the latest `main` branck.
