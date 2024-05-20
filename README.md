@@ -63,10 +63,11 @@ zig build --release=safe
 - Copy the executable into a location where it can be accessed easily.
 - Lastly follow the same step 1 [for windows](#for-windows) 
 
-## Supported Features
+## SFeatures
 - [x] Install versions (master, stable, x.y.z)
 - [x] Remove versions
 - [x] List down installed versions
+- [ ] Override zig versions to be used under certain directories
 
 ## License
 `zigvm` is licensed under the Apache License 2.0. See the [LICENSE](./LICENSE) file.
