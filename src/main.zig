@@ -1,14 +1,15 @@
 const std = @import("std");
+const utils = @import("utils.zig");
+const builtin = @import("builtin");
+const Cli = @import("cli.zig").Cli;
+const paths = @import("paths.zig");
 const http = std.http;
 const Client = std.http.Client;
 const json = std.json;
-const builtin = @import("builtin");
-const cli = @import("cli.zig");
 const File = std.fs.File;
 const Allocator = std.mem.Allocator;
-const utils = @import("utils.zig");
 const streql = utils.streql;
-const CommonDirs = utils.CommonDirs;
+const CommonPaths = paths.CommonPaths;
 
 pub const Rel = union(enum) {
     Master,
@@ -91,16 +92,16 @@ pub fn main() !void {
     var aa = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     const alloc = aa.allocator();
 
-    const command = try cli.read_args(alloc);
+    const command = try Cli.read_args(alloc);
 
     switch (command) {
-        cli.Cli.install => |version| {
+        Cli.install => |version| {
             var client = Client{ .allocator = alloc };
             defer client.deinit();
 
-            const dirs = try CommonDirs.resolve_dirs(alloc);
+            const cp = try CommonPaths.resolve(alloc);
 
-            if (!(try utils.check_not_installed(alloc, try Rel.releasefromVersion(alloc, null, version), dirs))) {
+            if (!(try utils.check_not_installed(alloc, try Rel.releasefromVersion(alloc, null, version), cp))) {
                 std.log.err("Version already installled. Quitting", .{});
                 std.process.exit(0);
             }
@@ -109,21 +110,28 @@ pub fn main() !void {
             const releases = try json.parseFromSlice(json.Value, alloc, resp.body[0..resp.length], json.ParseOptions{});
             const rel = try Rel.releasefromVersion(alloc, releases, version);
 
-            try install_release(alloc, &client, releases, rel, dirs);
+            try install_release(alloc, &client, releases, rel, cp);
         },
-        cli.Cli.remove => |version| {
-            const dirs = try CommonDirs.resolve_dirs(alloc);
+        Cli.remove => |version| {
+            const cp = try CommonPaths.resolve(alloc);
             const rel = try Rel.releasefromVersion(alloc, null, version);
-            try remove_release(alloc, rel, dirs);
+            try remove_release(alloc, rel, cp);
         },
-        cli.Cli.show => {
-            const dirs = try CommonDirs.resolve_dirs(alloc);
-            try show_info(dirs);
+        Cli.show => {
+            const cp = try CommonPaths.resolve(alloc);
+            try show_info(cp);
+        },
+        Cli.override => |version| {
+            _ = version;
+            // const paths = try CommonPaths.resolve(alloc);
+            // const rel = try Rel.releasefromVersion(alloc, null, version);
+            // const curr_dir = try std.process.getCwdAlloc(alloc);
+            // override(paths, rel, curr_dir);
         },
     }
 }
 
-pub fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(json.Value), rel: Rel, dirs: CommonDirs) !void {
+fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(json.Value), rel: Rel, cp: CommonPaths) !void {
     var release: json.Value = releases.value.object.get(rel.version()).?;
 
     const target = release.object.get(utils.target_name()) orelse return InstallError.TargetNotAvailable;
@@ -131,10 +139,11 @@ pub fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(
     const tarball_size = try std.fmt.parseInt(usize, target.object.get("size").?.string, 10);
 
     const tarball_dw_filename = try utils.dw_tarball_name(alloc, rel);
-    var try_tarball_file = dirs.download_dir.openFile(tarball_dw_filename, .{});
+
+    var try_tarball_file = cp.download_dir.openFile(tarball_dw_filename, .{});
 
     if (try_tarball_file == File.OpenError.FileNotFound) {
-        var tarball = try dirs.download_dir.createFile(tarball_dw_filename, .{});
+        var tarball = try cp.download_dir.createFile(tarball_dw_filename, .{});
         defer tarball.close();
 
         var tarball_writer = std.io.bufferedWriter(tarball.writer());
@@ -144,7 +153,7 @@ pub fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(
             &tarball_writer,
             tarball_size,
         );
-        try_tarball_file = dirs.download_dir.openFile(tarball_dw_filename, .{});
+        try_tarball_file = cp.download_dir.createFile(tarball_dw_filename, .{});
     } else {
         std.log.info("Found already existing tarball, using that", .{});
     }
@@ -161,18 +170,18 @@ pub fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(
     try tarball_file.seekTo(0);
 
     std.log.info("Extracting {s}", .{tarball_dw_filename});
-    try utils.extract_xz(alloc, dirs, rel, tarball_reader.reader());
+    try utils.extract_xz(alloc, cp, rel, tarball_reader.reader());
 
-    try dirs.download_dir.deleteFile(tarball_dw_filename);
+    try cp.download_dir.deleteFile(tarball_dw_filename);
 }
 
-fn remove_release(alloc: Allocator, rel: Rel, dirs: CommonDirs) !void {
-    if ((try utils.check_not_installed(alloc, rel, dirs))) {
+fn remove_release(alloc: Allocator, rel: Rel, cp: CommonPaths) !void {
+    if ((try utils.check_not_installed(alloc, rel, cp))) {
         std.log.err("Version not installled. Quitting", .{});
         std.process.exit(0);
     }
     const release_dir = try utils.release_name(alloc, rel);
-    try dirs.install_dir.deleteTree(release_dir);
+    try cp.install_dir.deleteTree(release_dir);
     std.log.err("Removed {s}", .{release_dir});
 }
 
@@ -193,9 +202,7 @@ fn download_tarball(client: *Client, tb_url: []const u8, tb_writer: anytype, tot
 
     var progress_bar: [52]u8 = undefined;
     progress_bar[0] = '[';
-    for (0..50) |i| {
-        progress_bar[i + 1] = ' ';
-    }
+    @memset(progress_bar[1..50], ' ');
     progress_bar[51] = ']';
 
     var buff: [1024]u8 = undefined;
@@ -214,9 +221,7 @@ fn download_tarball(client: *Client, tb_url: []const u8, tb_writer: anytype, tot
         const newbars: u8 = pcnt_complete / 2;
 
         if (newbars > bars) {
-            for (bars..newbars) |i| {
-                progress_bar[i + 1] = '|';
-            }
+            @memset(progress_bar[bars..newbars], '|');
             const dlspeed = @as(f64, @floatFromInt(dlnow)) / 1024 * 8 / @as(f64, @floatFromInt(timer.read()));
             std.debug.print("\r\t{s} {d}% {d:.1}kb/s", .{ progress_bar, pcnt_complete, dlspeed });
             bars = newbars;
@@ -264,9 +269,9 @@ fn make_request(client: *Client, uri: std.Uri) ?Client.Request {
     return null;
 }
 
-fn show_info(dirs: CommonDirs) !void {
-    std.debug.print("zigvm root:\t{s}\n\n", .{CommonDirs.get_zigvm_root()});
-    var iter = dirs.install_dir.iterate();
+fn show_info(cp: CommonPaths) !void {
+    std.debug.print("zigvm root:\t{s}\n\n", .{CommonPaths.get_zigvm_root()});
+    var iter = cp.install_dir.iterate();
 
     std.debug.print("Installed releases:\n\n", .{});
 
@@ -279,3 +284,5 @@ fn show_info(dirs: CommonDirs) !void {
         n += 1;
     }
 }
+
+// fn override(paths: CommonPaths, version: rel, directory: []const u8) !void {}
