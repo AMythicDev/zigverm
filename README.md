@@ -3,7 +3,7 @@ Version manager for the Zig Programming Language.
 
 It lets you install and manage your Zig installation.
 
-**zigvm is in early stages of its development, it can do [basic things](#supported-features) and platform support 
+**zigvm is in early stages of its development, it can do [basic things](#features) and platform support 
 may not be on par with other version managers. If you encounter issues or want to request a feature
 be sure to drop a issue on the GitHub issue tracker.**
 
@@ -11,7 +11,7 @@ be sure to drop a issue on the GitHub issue tracker.**
 Legend:  
 🎉 - Binary releases + automatic installer available  
 💪 - binary releases available  
-❌ - No binary releases. Compile for your own thing  
+❌ - No binary releases. Maybe supported later. Requires [compiling](#compiling)  
 \- - Not applicable
 
 | OS/Arch | x86_64 | x86 | aarch64 | armv7a | riscv64 |
@@ -63,7 +63,7 @@ zig build --release=safe
 - Copy the executable into a location where it can be accessed easily.
 - Lastly follow the same step 1 [for windows](#for-windows) 
 
-## SFeatures
+## Features
 - [x] Install versions (master, stable, x.y.z)
 - [x] Remove versions
 - [x] List down installed versions
