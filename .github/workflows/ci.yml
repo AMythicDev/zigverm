@@ -19,8 +19,8 @@ jobs:
     strategy:
       matrix:
         target:
-          - "x86_64-macos-darwin"
-          - "aarch64-macos-darwin"
+          - "x86_64-macos-none"
+          - "aarch64-macos-none"
           - "aarch64-linux-gnu"
           - "x86_64-linux-gnu"
           - "x86-linux-gnu"
