@@ -33,7 +33,11 @@ by setting the `ZIGVM_ROOT_DIR` to the directory where you want to install zigvm
 in your shell config otherwise zigvm would not be able to locate the installation folder.
 
 The script will also put the installation directory's `bin` folder to your `$PATH` variable. For this it will append
-a line to your `$HOME/.profile` and `$HOME/.bashrc` or `$HOME/.zshrc` depending on your default login shell.
+a line to your `$HOME/.profile` and your shell's rc file. The file for each shell supported is listed below:
+
+- Bash: `$HOME/.bashrc` 
+- Zsh: `$HOME/.zshrc`
+- Fish: `$XDG_CONFIG_HOME/fish/config.fish`, if not set then uses `$HOME/.config/fish/config.fish`
 
 ### For Windows
 * Create the following folder structure in `C:\Users\[YOU-USERNAME]\.zigvm`:
@@ -44,6 +48,7 @@ a line to your `$HOME/.profile` and `$HOME/.bashrc` or `$HOME/.zshrc` depending 
 └── installs
 ```
 * Download the latest release for Windows from GitHub, rename it to `zigvm.exe` and put it in the `bin` directory.
+* Ass the `bin` directory to your `PATH` enviroment variable
 
 ### Compiling
 Requirements:  
@@ -60,8 +65,7 @@ zig build --release=safe
 ```
 - If you are devloping `zigvm`, you can omit the `--release=safe` flag.
 - You will have `zigvm` in `zig-out/bin/` directory
-- Copy the executable into a location where it can be accessed easily.
-- Lastly follow the same step 1 [for windows](#for-windows) 
+- Lastly follow the same steps [for windows](#for-windows) 
 
 ## Features
 - [x] Install versions (master, stable, x.y.z)
