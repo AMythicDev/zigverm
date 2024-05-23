@@ -3,9 +3,9 @@ Version manager for the Zig Programming Language.
 
 It lets you install and manage your Zig installation.
 
-**zigvm is in early stages of its development, it can do [basic things](#features) and platform support 
-may not be on par with other version managers. If you encounter issues or want to request a feature
-be sure to drop a issue on the GitHub issue tracker.**
+**zigvm is in early stages of its development, it can do [basic things](#features) and platform
+support may not be on par with other version managers. If you encounter issues or want to request a
+feature be sure to drop a issue on the GitHub issue tracker.**
 
 ## Platform Support
 Legend:  
@@ -28,12 +28,14 @@ You can use this automated install script which will install zigvm along with th
 curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/AMythicDev/zigvm/main/scripts/install.sh | sh
 ```
 
-By default it will create `$HOME/.zigvm` directory as the root folder for zigvm. You can customize this by setting this
-by setting the `ZIGVM_ROOT_DIR` to the directory where you want to install zigvm. Make sire you add the `ZIGVM_ROOT_DIR`
-in your shell config otherwise zigvm would not be able to locate the installation folder.
+By default it will create `$HOME/.zigvm` directory as the root folder for zigvm. You can customize
+this by setting this by setting the `ZIGVM_ROOT_DIR` to the directory where you want to install
+zigvm. Make sire you add the `ZIGVM_ROOT_DIR` in your shell config otherwise zigvm would not be able
+to locate the installation folder.
 
-The script will also put the installation directory's `bin` folder to your `$PATH` variable. For this it will append
-a line to your `$HOME/.profile` and your shell's rc file. The file for each shell supported is listed below:
+The script will also put the installation directory's `bin` folder to your `$PATH` variable. For
+this it will append a line to your `$HOME/.profile` and your shell's rc file. The file for each
+shell supported is listed below:
 
 - Bash: `$HOME/.bashrc` 
 - Zsh: `$HOME/.zshrc`
@@ -47,17 +49,19 @@ a line to your `$HOME/.profile` and your shell's rc file. The file for each shel
 ├── downloads
 └── installs
 ```
-* Download the latest release for Windows from GitHub, rename it to `zigvm.exe` and put it in the `bin` directory.
+* Download the latest release for Windows from GitHub, rename it to `zigvm.exe` and put it in the
+`bin` directory.
 * Ass the `bin` directory to your `PATH` enviroment variable
 
 ### Compiling
 Requirements:  
-- Although `zigvm` can manage all versions of Zig, it itself requires Zig >= 0.12.0 to compile.
-- It also depemds pm your system libc on non-Windows systems.
-- You should have git installed, if you want to compile from the latest commit or you want to develop `zigvm`
+- Zig >= 0.12.0
+- libc on non-Windows systems. Can be provided by Zig itself, if available for the platform.
+- `git`, if you want to compile the latest commit or you want to develop `zigvm`.
 
 Now to compile:
-- Clone the repo or Download source a source archive depending on if you want to compile a release or the latest `main` branck.
+- Clone the repo or download a source archive depending on if you want to compile the latest `main`
+branck or a release.
 - Extract the archive and change into the extracted directory.
 - Run the following command
 ```
