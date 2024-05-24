@@ -40,10 +40,10 @@ pub const Rel = union(enum) {
         }
     }
 
-    fn resolve_stable_release(alloc: Allocator, releases: json.Parsed(json.Value)) std.ArrayList(u8) {
+    fn resolve_stable_release(alloc: Allocator, releases: json.Value) std.ArrayList(u8) {
         var buf = std.ArrayList(u8).init(alloc);
         var stable: ?std.SemanticVersion = null;
-        for (releases.value.object.keys()) |release| {
+        for (releases.object.keys()) |release| {
             if (streql(release, "master")) continue;
             var r = std.SemanticVersion.parse(release) catch unreachable;
             if (stable == null) {
@@ -58,7 +58,7 @@ pub const Rel = union(enum) {
         return buf;
     }
 
-    pub fn releasefromVersion(alloc: Allocator, releases: ?json.Parsed(json.Value), v: []const u8) InstallError!Self {
+    pub fn releasefromVersion(alloc: Allocator, releases: ?json.Value, v: []const u8) InstallError!Self {
         var rel: Rel = undefined;
         if (streql(v, "master")) {
             rel = Rel.Master;
@@ -107,7 +107,7 @@ pub fn main() !void {
             }
 
             const resp = try get_json_dslist(&client);
-            const releases = try json.parseFromSlice(json.Value, alloc, resp.body[0..resp.length], json.ParseOptions{});
+            const releases = try json.parseFromSliceLeaky(json.Value, alloc, resp.body[0..resp.length], .{});
             const rel = try Rel.releasefromVersion(alloc, releases, version);
 
             try install_release(alloc, &client, releases, rel, cp);
@@ -131,8 +131,8 @@ pub fn main() !void {
     }
 }
 
-fn install_release(alloc: Allocator, client: *Client, releases: json.Parsed(json.Value), rel: Rel, cp: CommonPaths) !void {
-    var release: json.Value = releases.value.object.get(rel.version()).?;
+fn install_release(alloc: Allocator, client: *Client, releases: json.Value, rel: Rel, cp: CommonPaths) !void {
+    var release: json.Value = releases.object.get(rel.version()).?;
 
     const target = release.object.get(utils.target_name()) orelse return InstallError.TargetNotAvailable;
     const tarball_url = target.object.get("tarball").?.string;
