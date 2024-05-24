@@ -19,7 +19,7 @@ pub const CommonPaths = struct {
             .zigvm_root = zigvm_root,
             .install_dir = try zigvm_root.openDir("installs/", .{ .iterate = true }),
             .download_dir = try zigvm_root.openDir("downloads/", .{ .iterate = true }),
-            .overrides = try zigvm_root.createFile("overrides.json", .{ .truncate = false }),
+            .overrides = try zigvm_root.createFile("overrides.json", .{ .truncate = false, .read = true }),
         };
     }
 

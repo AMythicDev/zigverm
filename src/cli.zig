@@ -8,24 +8,31 @@ const helptext =
     \\zigvm [options] [command]
     \\
     \\Commands:
-    \\      install <version>      Install a specific version. Version can be any valid semantic version
-    \\                             or master or stable
-    \\      override <version>     Override the version of zig used inside current directory and all its
-    \\                             child directories
-    \\      remove <version>       Remove a already installed specific version. Version can be any 
-    \\                             valid semantic version or master or stable
-    \\      info                   Show information about installations
+    \\      install <version>                   Install a specific version. Version can be any valid semantic version
+    \\                                          or master or stable
+    \\      override [DIRECTORY] <version>      Override the version of zig used under DIRECTORY. DIRECTORY can be
+    \\                                              - Path to a directory, under which to override
+    \\                                              - "default", to change the default version
+    \\                                              - An empty string to use the current directory
+    \\      remove <version>                    Remove a already installed specific version. Version can be any 
+    \\                                          valid semantic version or master or stable
+    \\      info                                Show information about installations
     \\    
     \\Options:
     \\      -h  --help           Show this help message
     \\      -V  --version        Print version info
 ;
 
+pub const OverrideArrgs = struct {
+    version: []const u8,
+    directory: ?[]const u8,
+};
+
 pub const Cli = union(enum) {
     install: []const u8,
     remove: []const u8,
     show,
-    override: []const u8,
+    override: OverrideArrgs,
 
     pub fn read_args(alloc: Allocator) anyerror!Cli {
         var arg_iter = try std.process.argsWithAllocator(alloc);
@@ -57,8 +64,19 @@ pub const Cli = union(enum) {
             std.debug.print("{s}\n", .{helptext});
             std.process.exit(0);
         } else if (streql(cmd, "override")) {
-            const rel = arg_iter.next() orelse return incorrectUsage(null);
-            command = Cli{ .override = try alloc.dupe(u8, rel) };
+            const rel_or_directory = arg_iter.next() orelse return incorrectUsage(null);
+            const rel = arg_iter.next();
+
+            var override_args = OverrideArrgs{ .version = undefined, .directory = null };
+
+            if (rel != null) {
+                override_args.version = try alloc.dupe(u8, rel.?);
+                override_args.directory = try alloc.dupe(u8, rel_or_directory);
+            } else {
+                override_args.version = try alloc.dupe(u8, rel_or_directory);
+            }
+
+            command = Cli{ .override = override_args };
         } else incorrectUsage(cmd);
 
         return command;
