@@ -14,6 +14,10 @@ const helptext =
     \\                                              - Path to a directory, under which to override
     \\                                              - "default", to change the default version
     \\                                              - An empty string to use the current directory
+    \\      override-rm [DIRECTORY]            Override the version of zig used under DIRECTORY. DIRECTORY can be
+    \\                                              - Path to a directory, under which to override
+    \\                                              - "default", to change the default version
+    \\                                              - An empty string to use the current directory
     \\      remove <version>                    Remove a already installed specific version. Version can be any 
     \\                                          valid semantic version or master or stable
     \\      info                                Show information about installations
@@ -33,6 +37,7 @@ pub const Cli = union(enum) {
     remove: []const u8,
     show,
     override: OverrideArrgs,
+    override_rm: ?[]const u8,
 
     pub fn read_args(alloc: Allocator) anyerror!Cli {
         var arg_iter = try std.process.argsWithAllocator(alloc);
@@ -77,6 +82,9 @@ pub const Cli = union(enum) {
             }
 
             command = Cli{ .override = override_args };
+        } else if (streql(cmd, "override-rm")) {
+            const directory = arg_iter.next();
+            command = Cli{ .override_rm = directory };
         } else incorrectUsage(cmd);
 
         return command;
