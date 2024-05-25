@@ -76,7 +76,7 @@ zig build --release=safe
 - [x] Remove versions
 - [x] List down installed versions
 - [x] Add override for zig versions to be used under certain directories
-- [ ] Remove overrides
+- [x] Remove overrides
 
 ## License
 `zigvm` is licensed under the Apache License 2.0. See the [LICENSE](./LICENSE) file.
