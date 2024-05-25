@@ -95,6 +95,7 @@ pub fn main() !void {
     const command = try Cli.read_args(alloc);
 
     const cp = try CommonPaths.resolve(alloc);
+    defer cp.clone();
 
     switch (command) {
         Cli.install => |version| {

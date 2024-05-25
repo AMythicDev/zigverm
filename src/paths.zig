@@ -10,6 +10,8 @@ pub const CommonPaths = struct {
     download_dir: Dir,
     overrides: File,
 
+    const Self = @This();
+
     var zigvm_root_path: []const u8 = undefined;
 
     pub fn resolve(alloc: Allocator) !@This() {
@@ -36,5 +38,12 @@ pub const CommonPaths = struct {
 
     pub fn get_zigvm_root() []const u8 {
         return zigvm_root_path;
+    }
+
+    pub fn clone(self: *Self) void {
+        self.overrides.close();
+        self.download_dir.close();
+        self.install_dir.close();
+        self.zigvm_root.close();
     }
 };
