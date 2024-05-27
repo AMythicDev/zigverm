@@ -1,47 +1,15 @@
 const std = @import("std");
-const Allocator = std.mem.Allocator;
 const builtin = @import("builtin");
-const OsTag = std.Target.Os.Tag;
 const Rel = @import("main.zig").Rel;
+const CommonPaths = @import("common").paths.CommonPaths;
+const streql = @import("common").streql;
+
+const Allocator = std.mem.Allocator;
+const OsTag = std.Target.Os.Tag;
 const Sha256 = std.crypto.hash.sha2.Sha256;
-const CommonPaths = @import("paths.zig").CommonPaths;
 
 const default_os = builtin.target.os.tag;
 const default_arch = builtin.target.cpu.arch;
-
-pub extern "c" fn getuid() u32;
-
-pub fn streql(cmd: []const u8, key: []const u8) bool {
-    return std.mem.eql(u8, cmd, key);
-}
-
-pub fn home_dir(alloc: Allocator) ![]const u8 {
-    if (default_os == OsTag.windows) {
-        if (std.process.getEnvVarOwned(alloc, "USERPROFILE")) |val| {
-            return val;
-        } else |_| {
-            var buff = std.ArrayList(u8).init(alloc);
-            try buff.appendSlice(try std.process.getEnvVarOwned(alloc, "HOMEDRIVE"));
-            try buff.appendSlice(try std.process.getEnvVarOwned(alloc, "HOMEPATH"));
-            return buff.items;
-        }
-    }
-
-    if (default_os.isBSD() or default_os.isDarwin() or default_os == OsTag.linux) {
-        if (std.process.getEnvVarOwned(alloc, "HOME")) |val| {
-            return val;
-        } else |_| {
-            switch (default_os) {
-                OsTag.linux, OsTag.openbsd => {
-                    return std.mem.span(std.c.getpwuid(getuid()).?.pw_dir.?);
-                },
-                else => {
-                    @panic("Cannot determine home directory");
-                },
-            }
-        }
-    }
-}
 
 pub fn target_name() []const u8 {
     return @tagName(default_arch) ++ "-" ++ @tagName(default_os);

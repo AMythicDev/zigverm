@@ -1,6 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const streql = @import("utils.zig").streql;
+const streql = @import("common").streql;
 
 const helptext =
     \\zigvm - A version manager for Zig

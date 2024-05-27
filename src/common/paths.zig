@@ -2,7 +2,11 @@ const std = @import("std");
 const Dir = std.fs.Dir;
 const File = std.fs.File;
 const Allocator = std.mem.Allocator;
-const utils = @import("utils.zig");
+const builtin = @import("builtin");
+const OsTag = std.Target.Os.Tag;
+
+const default_os = builtin.target.os.tag;
+const default_arch = builtin.target.cpu.arch;
 
 pub const CommonPaths = struct {
     zigvm_root: Dir,
@@ -30,7 +34,7 @@ pub const CommonPaths = struct {
             return val;
         } else |_| {
             var buff = std.ArrayList(u8).init(alloc);
-            try buff.appendSlice(try utils.home_dir(alloc));
+            try buff.appendSlice(try home_dir(alloc));
             try buff.appendSlice("/.zigvm");
             return buff.items;
         }
@@ -47,3 +51,33 @@ pub const CommonPaths = struct {
         self.zigvm_root.close();
     }
 };
+
+pub extern "c" fn getuid() u32;
+
+pub fn home_dir(alloc: Allocator) ![]const u8 {
+    if (default_os == OsTag.windows) {
+        if (std.process.getEnvVarOwned(alloc, "USERPROFILE")) |val| {
+            return val;
+        } else |_| {
+            var buff = std.ArrayList(u8).init(alloc);
+            try buff.appendSlice(try std.process.getEnvVarOwned(alloc, "HOMEDRIVE"));
+            try buff.appendSlice(try std.process.getEnvVarOwned(alloc, "HOMEPATH"));
+            return buff.items;
+        }
+    }
+
+    if (default_os.isBSD() or default_os.isDarwin() or default_os == OsTag.linux) {
+        if (std.process.getEnvVarOwned(alloc, "HOME")) |val| {
+            return val;
+        } else |_| {
+            switch (default_os) {
+                OsTag.linux, OsTag.openbsd => {
+                    return std.mem.span(std.c.getpwuid(getuid()).?.pw_dir.?);
+                },
+                else => {
+                    @panic("Cannot determine home directory");
+                },
+            }
+        }
+    }
+}

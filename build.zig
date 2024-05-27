@@ -16,16 +16,19 @@ pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const common = b.createModule(.{ .root_source_file = .{ .path = "src/common/root.zig" } });
+    const default_os = target.result.os.tag;
+    if (default_os.isBSD() or default_os.isDarwin() or default_os == std.Target.Os.Tag.linux) {
+        common.link_libc = true;
+    }
+
     const default_exe = b.addExecutable(.{
         .name = "zigvm",
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
-    const default_os = target.result.os.tag;
-    if (default_os.isBSD() or default_os.isDarwin() or default_os == std.Target.Os.Tag.linux) {
-        default_exe.linkLibC();
-    }
+    default_exe.root_module.addImport("common", common);
     b.installArtifact(default_exe);
 
     const run_cmd = b.addRunArtifact(default_exe);
@@ -57,10 +60,6 @@ pub fn build(b: *std.Build) !void {
 
         const target_output = b.addInstallArtifact(exe, .{});
         release_step.dependOn(&target_output.step);
-
-        const ostag = target.result.os.tag;
-        if (ostag.isBSD() or ostag.isDarwin() or ostag == std.Target.Os.Tag.linux) {
-            exe.linkLibC();
-        }
+        exe.root_module.addImport("common", common);
     }
 }
