@@ -15,23 +15,16 @@ OS=$(uname -s | awk '{print tolower($0)}')
 ARCH=$(uname -m | awk '{print tolower($0)}')
 
 curl -L https://github.com/AMythicDev/zigvm/releases/download/v0.1.0/zigvm-0.1.0-${ARCH}-${OS}.zip > /tmp/zigvm.zip
-unzip /tmp/zigvm.zip
-
-mv zigvm-0.1.0-${ARCH}-${OS}/zigvm $ZIGVM_ROOT_DIR/bin/
-mv zigvm-0.1.0-${ARCH}-${OS}/zig $ZIGVM_ROOT_DIR/bin/
-
-chmod 755 $ZIGVM_ROOT_DIR/bin/zigvm 
-chmod 755 $ZIGVM_ROOT_DIR/bin/zig
+unzip /tmp/zigvm.zip -d $ZIGVM_ROOT_DIR/bin/ 
 
 echo "Installing zig stable"
 $ZIGVM_ROOT_DIR/bin/zigvm install stable
 echo "Setting default version to stable"
 $ZIGVM_ROOT_DIR/bin/zigvm override default stable
 
-
 DEFAULT_SHELL=$(getent passwd arijit | awk -F: '{ print($NF) } ' | awk -F/ '{ print ($NF) }')
 
-case DEFAULT_SHELL in
+case $DEFAULT_SHELL in
   "bash")
     echo 'export PATH=$PATH:'$ZIGVM_ROOT_DIR/bin >> $HOME/.bashrc
     ;;
@@ -44,9 +37,9 @@ case DEFAULT_SHELL in
   *)
     echo "Cannot write to shell rc file. Unknown shell" 1>&2;
     echo "You need to manually add {$ZIGVM_ROOT_DIR}/bin to ensure zigvm can be called from anywhere."
+    ;;
 esac
 
 echo 'export PATH=$PATH:'$ZIGVM_ROOT_DIR/bin/ >> $HOME/.profile
 
-echo "\033[0;33;1mzigvm installed successfully"
-echo "Please restart your terminal for changes to take effect."
+echo -e "\033[0;33;1mzigvm installed successfully\nPlease restart your terminal for changes to take effect.\033[0m"

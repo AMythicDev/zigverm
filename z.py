@@ -26,7 +26,8 @@ def make_release():
         print(f"Building for {target}")
         target_dir = "zigvm-" + VERSION + "-" + target
         subprocess.run(["zig", "build", "install", "--prefix", "releases/",
-                       "--prefix-exe-dir", target_dir, "--release=safe"])
+                       "--prefix-exe-dir", target_dir, "--release=safe",
+                        f"-Dtarget={target}"])
         shutil.make_archive("releases/" + target_dir,
                             "zip", "releases/" + target_dir)
 

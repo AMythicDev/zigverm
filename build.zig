@@ -10,17 +10,21 @@ pub fn build(b: *std.Build) !void {
         common.link_libc = true;
     }
 
+    const strip = if (optimize == std.builtin.OptimizeMode.ReleaseSafe) true else null;
+
     const zigvm = b.addExecutable(.{
         .name = "zigvm",
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
+        .strip = strip,
     });
     const zig = b.addExecutable(.{
         .name = "zig",
         .root_source_file = b.path("src/zig//main.zig"),
         .target = target,
         .optimize = optimize,
+        .strip = strip,
     });
 
     zigvm.root_module.addImport("common", common);

@@ -87,8 +87,7 @@ fn install_release(alloc: Allocator, client: *Client, releases: json.Value, rel:
     var try_tarball_file = cp.download_dir.openFile(tarball_dw_filename, .{});
 
     if (try_tarball_file == File.OpenError.FileNotFound) {
-        var tarball = try cp.download_dir.createFile(tarball_dw_filename, .{});
-        defer tarball.close();
+        var tarball = try cp.download_dir.createFile(tarball_dw_filename, .{ .read = true });
 
         var tarball_writer = std.io.bufferedWriter(tarball.writer());
         try download_tarball(
@@ -97,13 +96,15 @@ fn install_release(alloc: Allocator, client: *Client, releases: json.Value, rel:
             &tarball_writer,
             tarball_size,
         );
-        try_tarball_file = cp.download_dir.createFile(tarball_dw_filename, .{});
+        try_tarball_file = tarball;
+        try tarball.seekTo(0);
     } else {
         std.log.info("Found already existing tarball, using that", .{});
     }
 
     const tarball_file = try try_tarball_file;
     defer tarball_file.close();
+
     var tarball_reader = std.io.bufferedReader(tarball_file.reader());
     const hash_matched = try utils.check_hash(target.object.get("shasum").?.string[0..64], tarball_reader.reader());
 
