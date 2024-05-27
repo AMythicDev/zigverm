@@ -69,7 +69,7 @@ pub const Cli = union(enum) {
         } else if (streql(cmd, "-h") or streql(cmd, "--help")) {
             std.debug.print("{s}\n", .{helptext});
             std.process.exit(0);
-        } else if (streql(cmd, "-v") or streql(cmd, "--version")) {
+        } else if (streql(cmd, "-V") or streql(cmd, "--version")) {
             std.debug.print("{s}\n", .{Version});
             std.process.exit(0);
         } else if (streql(cmd, "override")) {

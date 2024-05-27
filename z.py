@@ -35,7 +35,8 @@ def main():
     args = sys.argv
 
     if args[1] == "run":
-        subprocess.run(args[2:])
+        subprocess.run(["zig", "build"])
+        subprocess.run(["zig-out/bin/" + args[2]] + args[3:])
     elif args[1] == "make-release":
         make_release()
 
