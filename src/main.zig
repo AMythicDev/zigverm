@@ -12,72 +12,7 @@ const File = std.fs.File;
 const Allocator = std.mem.Allocator;
 const streql = common.streql;
 const CommonPaths = paths.CommonPaths;
-
-pub const Rel = union(enum) {
-    Master,
-    Stable: ?[]const u8,
-    Version: []const u8,
-
-    const Self = @This();
-
-    pub fn version(self: Self) []const u8 {
-        switch (self) {
-            Rel.Master => return "master",
-            Rel.Stable => |ver| {
-                if (ver) |v| {
-                    return v;
-                } else {
-                    @panic("Rel.version() called when Rel.Stable is not resolved");
-                }
-            },
-            Rel.Version => |v| return v,
-        }
-    }
-
-    pub fn as_string(self: Self) []const u8 {
-        switch (self) {
-            Rel.Master => return "master",
-            Rel.Version => |v| return v,
-            Rel.Stable => return "stable",
-        }
-    }
-
-    fn resolve_stable_release(alloc: Allocator, releases: json.Value) std.ArrayList(u8) {
-        var buf = std.ArrayList(u8).init(alloc);
-        var stable: ?std.SemanticVersion = null;
-        for (releases.object.keys()) |release| {
-            if (streql(release, "master")) continue;
-            var r = std.SemanticVersion.parse(release) catch unreachable;
-            if (stable == null) {
-                stable = r;
-                continue;
-            }
-            if (r.order(stable.?) == std.math.Order.gt) {
-                stable = r;
-            }
-        }
-        stable.?.format("", .{}, buf.writer()) catch unreachable;
-        return buf;
-    }
-
-    pub fn releasefromVersion(alloc: Allocator, releases: ?json.Value, v: []const u8) InstallError!Self {
-        var rel: Rel = undefined;
-        if (streql(v, "master")) {
-            rel = Rel.Master;
-        } else if (streql(v, "stable")) {
-            if (releases) |r| {
-                rel = Rel{ .Stable = Rel.resolve_stable_release(alloc, r).items };
-            } else {
-                rel = Rel{ .Stable = null };
-            }
-        } else if (std.SemanticVersion.parse(v)) |_| {
-            rel = Rel{ .Version = v };
-        } else |_| {
-            return InstallError.InvalidVersion;
-        }
-        return rel;
-    }
-};
+const Rel = common.Rel;
 
 const InstallError = error{
     ReleaseNotFound,
@@ -187,7 +122,7 @@ fn remove_release(alloc: Allocator, rel: Rel, cp: CommonPaths) !void {
         std.log.err("Version not installled. Quitting", .{});
         std.process.exit(0);
     }
-    const release_dir = try utils.release_name(alloc, rel);
+    const release_dir = try common.release_name(alloc, rel);
     try cp.install_dir.deleteTree(release_dir);
     std.log.err("Removed {s}", .{release_dir});
 }

@@ -1,17 +1,5 @@
 const std = @import("std");
 
-const targets: []const std.Target.Query = &.{
-    .{ .cpu_arch = .x86_64, .os_tag = .macos },
-    .{ .cpu_arch = .aarch64, .os_tag = .macos },
-
-    .{ .cpu_arch = .aarch64, .os_tag = .linux },
-    .{ .cpu_arch = .x86_64, .os_tag = .linux, .abi = .gnu },
-    .{ .cpu_arch = .x86, .os_tag = .linux, .abi = .gnu },
-
-    .{ .cpu_arch = .x86_64, .os_tag = .windows },
-    .{ .cpu_arch = .x86, .os_tag = .windows },
-};
-
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -22,16 +10,25 @@ pub fn build(b: *std.Build) !void {
         common.link_libc = true;
     }
 
-    const default_exe = b.addExecutable(.{
+    const zigvm = b.addExecutable(.{
         .name = "zigvm",
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
-    default_exe.root_module.addImport("common", common);
-    b.installArtifact(default_exe);
+    const zig = b.addExecutable(.{
+        .name = "zig",
+        .root_source_file = b.path("src/zig//main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
 
-    const run_cmd = b.addRunArtifact(default_exe);
+    zigvm.root_module.addImport("common", common);
+    zig.root_module.addImport("common", common);
+    b.installArtifact(zigvm);
+    b.installArtifact(zig);
+
+    const run_cmd = b.addRunArtifact(zigvm);
     run_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
         run_cmd.addArgs(args);
@@ -47,19 +44,4 @@ pub fn build(b: *std.Build) !void {
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_exe_unit_tests.step);
-
-    const release_step = b.step("make-release", "Create binaries for releasing");
-    for (targets) |t| {
-        const name = try std.mem.concat(b.allocator, u8, &.{ "zigvm-", try t.zigTriple(b.allocator) });
-        const exe = b.addExecutable(.{
-            .name = name,
-            .root_source_file = b.path("src/main.zig"),
-            .target = b.resolveTargetQuery(t),
-            .optimize = .ReleaseSafe,
-        });
-
-        const target_output = b.addInstallArtifact(exe, .{});
-        release_step.dependOn(&target_output.step);
-        exe.root_module.addImport("common", common);
-    }
 }

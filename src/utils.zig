@@ -1,8 +1,10 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const Rel = @import("main.zig").Rel;
-const CommonPaths = @import("common").paths.CommonPaths;
-const streql = @import("common").streql;
+const common = @import("common");
+const CommonPaths = common.paths.CommonPaths;
+const streql = common.streql;
+const release_name = common.release_name;
+const Rel = common.Rel;
 
 const Allocator = std.mem.Allocator;
 const OsTag = std.Target.Os.Tag;
@@ -19,12 +21,6 @@ pub fn dw_tarball_name(alloc: Allocator, rel: Rel) ![]const u8 {
     const release_string = rel.as_string();
     const dw_target = comptime target_name();
     return try std.mem.concat(alloc, u8, &[_][]const u8{ "zig-" ++ dw_target ++ "-", release_string, ".tar.xz.partial" });
-}
-
-pub fn release_name(alloc: Allocator, rel: Rel) ![]const u8 {
-    const release_string = rel.as_string();
-    const dw_target = comptime target_name();
-    return try std.mem.concat(alloc, u8, &[_][]const u8{ "zig-" ++ dw_target ++ "-", release_string });
 }
 
 pub fn check_install_name(name: []const u8) bool {

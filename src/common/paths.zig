@@ -4,9 +4,8 @@ const File = std.fs.File;
 const Allocator = std.mem.Allocator;
 const builtin = @import("builtin");
 const OsTag = std.Target.Os.Tag;
-
-const default_os = builtin.target.os.tag;
-const default_arch = builtin.target.cpu.arch;
+const default_os = @import("root.zig").default_os;
+const default_arch = @import("root.zig").default_arch;
 
 pub const CommonPaths = struct {
     zigvm_root: Dir,
