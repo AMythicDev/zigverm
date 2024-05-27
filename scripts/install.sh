@@ -14,10 +14,20 @@ mkdir -p $ZIGVM_ROOT_DIR/{downloads,installs,bin}
 OS=$(uname -s | awk '{print tolower($0)}')
 ARCH=$(uname -m | awk '{print tolower($0)}')
 
-curl -L https://github.com/AMythicDev/zigvm/releases/download/v0.1.0/zigvm-0.1.0-${ARCH}-${OS} > $ZIGVM_ROOT_DIR/bin/zigvm
-chmod 755 $ZIGVM_ROOT_DIR/bin/zigvm 
+curl -L https://github.com/AMythicDev/zigvm/releases/download/v0.1.0/zigvm-0.1.0-${ARCH}-${OS}.zip > /tmp/zigvm.zip
+unzip /tmp/zigvm.zip
 
+mv zigvm-0.1.0-${ARCH}-${OS}/zigvm $ZIGVM_ROOT_DIR/bin/
+mv zigvm-0.1.0-${ARCH}-${OS}/zig $ZIGVM_ROOT_DIR/bin/
+
+chmod 755 $ZIGVM_ROOT_DIR/bin/zigvm 
+chmod 755 $ZIGVM_ROOT_DIR/bin/zig
+
+echo "Installing zig stable"
 $ZIGVM_ROOT_DIR/bin/zigvm install stable
+echo "Setting default version to stable"
+$ZIGVM_ROOT_DIR/bin/zigvm override default stable
+
 
 DEFAULT_SHELL=$(getent passwd arijit | awk -F: '{ print($NF) } ' | awk -F/ '{ print ($NF) }')
 

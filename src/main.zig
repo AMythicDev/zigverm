@@ -14,6 +14,8 @@ const streql = common.streql;
 const CommonPaths = paths.CommonPaths;
 const Rel = common.Rel;
 
+pub const Version = "0.1.0";
+
 const InstallError = error{
     ReleaseNotFound,
     InvalidVersion,

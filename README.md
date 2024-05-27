@@ -49,8 +49,8 @@ shell supported is listed below:
 ├── downloads
 └── installs
 ```
-* Download the latest release for Windows from GitHub, rename it to `zigvm.exe` and put it in the
-`bin` directory.
+* Download the latest release for Windows from GitHub and extract it.
+* Copy `zigvm.exe` and `zig.exe` to the `bin/` folder.
 * Ass the `bin` directory to your `PATH` enviroment variable
 
 ### Compiling
@@ -68,7 +68,7 @@ branck or a release.
 zig build --release=safe
 ```
 - If you are devloping `zigvm`, you can omit the `--release=safe` flag.
-- You will have `zigvm` in `zig-out/bin/` directory
+- You will have `zigvm` and `zig` in `zig-out/bin/` directory
 - Lastly follow the same steps [for windows](#for-windows) 
 
 ## Features
