@@ -75,8 +75,8 @@ zig build --release=safe
 - [x] Install versions (master, stable, x.y.z)
 - [x] Remove versions
 - [x] List down installed versions
-- [x] Add override for zig versions to be used under certain directories
-- [x] Remove overrides
+- [x] Manage default and per-directory version overrides
+- [x] Tries to maintain strong compatiblity with the wider zig ecosystem (`zls`, `zig.vim`)
 
 ## License
 `zigvm` is licensed under the Apache License 2.0. See the [LICENSE](./LICENSE) file.
