@@ -57,7 +57,7 @@ pub fn main() !void {
             try remove_release(alloc, rel, cp);
         },
         Cli.show => {
-            try show_info(cp);
+            try show_info(alloc, cp);
         },
         Cli.override => |oa| {
             var override_args = oa;
@@ -214,10 +214,14 @@ fn make_request(client: *Client, uri: std.Uri) ?Client.Request {
     return null;
 }
 
-fn show_info(cp: CommonPaths) !void {
+fn show_info(alloc: Allocator, cp: CommonPaths) !void {
     std.debug.print("zigvm root:\t{s}\n\n", .{CommonPaths.get_zigvm_root()});
     var iter = cp.install_dir.iterate();
 
+    const dir_to_check = try std.process.getCwdAlloc(alloc);
+    const active_version = try common.overrides.active_version(alloc, cp, dir_to_check);
+
+    std.debug.print("Active version: {s} (from '{s}')\n\n", .{ active_version.ver, active_version.from });
     std.debug.print("Installed releases:\n\n", .{});
 
     var n: u8 = 1;

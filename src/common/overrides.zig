@@ -39,3 +39,31 @@ pub fn write_overrides(overrides: StringArrayHashMap(json.Value), cp: CommonPath
     _ = try file_writer.write("\n");
     try file_writer.flush();
 }
+
+pub fn active_version(alloc: Allocator, cp: CommonPaths, dir_to_check: []const u8) !struct { from: []const u8, ver: []const u8 } {
+    var from = dir_to_check;
+    const overrides = try read_overrides(alloc, cp);
+
+    var best_match: ?[]const u8 = null;
+
+    while (true) {
+        if (overrides.get(from)) |val| {
+            best_match = val.string;
+            break;
+        } else {
+            const next_dir_to_check = std.fs.path.dirname(from);
+
+            if (next_dir_to_check) |d|
+                from = @constCast(d)
+            else
+                break;
+        }
+    }
+
+    if (best_match == null) {
+        best_match = overrides.get("default").?.string;
+        from = "default";
+    }
+
+    return .{ .from = from, .ver = best_match.? };
+}

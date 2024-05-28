@@ -9,33 +9,14 @@ pub fn main() !void {
     var cp = try common.paths.CommonPaths.resolve(alloc);
     defer cp.clone();
 
-    const overrides = try common.overrides.read_overrides(alloc, cp);
+    const dir_to_check = try std.process.getCwdAlloc(alloc);
 
-    var dir_to_check = try std.process.getCwdAlloc(alloc);
-
-    var best_match: ?[]const u8 = null;
-
-    while (true) {
-        if (overrides.get(dir_to_check)) |val| {
-            best_match = val.string;
-            break;
-        } else {
-            const next_dir_to_check = std.fs.path.dirname(dir_to_check);
-
-            if (next_dir_to_check) |d|
-                dir_to_check = @constCast(d)
-            else
-                break;
-        }
-    }
-
-    if (best_match == null)
-        best_match = overrides.get("default").?.string;
+    const best_match = (try common.overrides.active_version(alloc, cp, dir_to_check)).ver;
 
     const zig_path = try std.fs.path.join(alloc, &.{
         common.paths.CommonPaths.get_zigvm_root(),
         "installs/",
-        try common.release_name(alloc, try common.Rel.releasefromVersion(alloc, null, best_match.?)),
+        try common.release_name(alloc, try common.Rel.releasefromVersion(alloc, null, best_match)),
         "zig",
     });
 
