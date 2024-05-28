@@ -50,5 +50,9 @@ pub fn main() !void {
     }
 
     var child = std.process.Child.init(executable.items, alloc);
-    _ = try child.spawnAndWait();
+    child.stdin = std.io.getStdIn();
+    child.stdout = std.io.getStdOut();
+    child.stderr = std.io.getStdErr();
+    const term = try child.spawnAndWait();
+    std.process.exit(term.Exited);
 }
