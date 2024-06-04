@@ -129,7 +129,7 @@ fn remove_release(alloc: Allocator, rel: Rel, cp: CommonPaths) !void {
     }
     const release_dir = try common.release_name(alloc, rel);
     try cp.install_dir.deleteTree(release_dir);
-    std.log.err("Removed {s}", .{release_dir});
+    std.log.info("Removed {s}", .{release_dir});
 }
 
 fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, tb_writer: anytype, tarball_size: u64, total_size: usize) !void {
