@@ -13,19 +13,9 @@ const Allocator = std.mem.Allocator;
 const streql = common.streql;
 const CommonPaths = paths.CommonPaths;
 const Rel = common.Rel;
+const install = @import("install.zig");
 
 pub const Version = "0.1.0";
-
-const InstallError = error{
-    ReleaseNotFound,
-    InvalidVersion,
-    TargetNotAvailable,
-};
-
-const JsonResponse = struct {
-    body: [100 * 1024]u8,
-    length: usize,
-};
 
 pub fn main() !void {
     var aa = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -46,11 +36,7 @@ pub fn main() !void {
                 std.process.exit(0);
             }
 
-            const resp = try get_json_dslist(&client);
-            const releases = try json.parseFromSliceLeaky(json.Value, alloc, resp.body[0..resp.length], .{});
-            const rel = try Rel.releasefromVersion(alloc, releases, version);
-
-            try install_release(alloc, &client, releases, rel, cp);
+            try install.install_release(alloc, &client, version, cp);
         },
         Cli.remove => |version| {
             const rel = try Rel.releasefromVersion(alloc, null, version);
@@ -75,53 +61,6 @@ pub fn main() !void {
     }
 }
 
-fn install_release(alloc: Allocator, client: *Client, releases: json.Value, rel: Rel, cp: CommonPaths) !void {
-    var release: json.Value = releases.object.get(rel.version()).?;
-
-    const target = release.object.get(utils.target_name()) orelse return InstallError.TargetNotAvailable;
-    const tarball_url = target.object.get("tarball").?.string;
-    const total_size = try std.fmt.parseInt(usize, target.object.get("size").?.string, 10);
-
-    const tarball_dw_filename = try utils.dw_tarball_name(alloc, rel);
-
-    // IMPORTANT: To continue downloading if the file isn't completely downloaded AKA partial downloading, we
-    // open the file with .truncate = false and then later move the file cursor to the end of the file using seekFromEnd().
-    // This is basically Zig's equivalent to *open in append mode*.
-    var tarball = try cp.download_dir.createFile(tarball_dw_filename, .{ .read = true, .truncate = false });
-    defer tarball.close();
-    const tarball_size = (try tarball.metadata()).size();
-
-    if (tarball_size < total_size) {
-        try tarball.seekFromEnd(0);
-        var tarball_writer = std.io.bufferedWriter(tarball.writer());
-        try download_tarball(
-            alloc,
-            client,
-            tarball_url,
-            &tarball_writer,
-            tarball_size,
-            total_size,
-        );
-        try tarball.seekTo(0);
-    } else {
-        std.log.info("Found already existing tarball, using that", .{});
-    }
-
-    var tarball_reader = std.io.bufferedReader(tarball.reader());
-    const hash_matched = try utils.check_hash(target.object.get("shasum").?.string[0..64], tarball_reader.reader());
-
-    if (!hash_matched) {
-        std.log.err("Hashes do match for downloaded tarball. Exitting", .{});
-        return error.BadChecksum;
-    }
-    try tarball.seekTo(0);
-
-    std.log.info("Extracting {s}", .{tarball_dw_filename});
-    try utils.extract_xz(alloc, cp, rel, tarball_reader.reader());
-
-    try cp.download_dir.deleteFile(tarball_dw_filename);
-}
-
 fn remove_release(alloc: Allocator, rel: Rel, cp: CommonPaths) !void {
     if ((try utils.check_not_installed(alloc, rel, cp))) {
         std.log.err("Version not installled. Quitting", .{});
@@ -130,98 +69,6 @@ fn remove_release(alloc: Allocator, rel: Rel, cp: CommonPaths) !void {
     const release_dir = try common.release_name(alloc, rel);
     try cp.install_dir.deleteTree(release_dir);
     std.log.info("Removed {s}", .{release_dir});
-}
-
-fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, tb_writer: anytype, tarball_size: u64, total_size: usize) !void {
-    std.log.info("Downloading {s}", .{tb_url});
-    const tarball_uri = try std.Uri.parse(tb_url);
-
-    var req = make_request(client, tarball_uri);
-    defer req.?.deinit();
-    if (req == null) {
-        std.log.err("Failed fetching the install tarball. Exitting (1)...", .{});
-        std.process.exit(1);
-    }
-
-    // Attach the Range header for partial downloads
-    var size = std.ArrayList(u8).init(alloc);
-    try size.appendSlice("bytes=");
-    var size_writer = size.writer();
-    try std.fmt.formatInt(tarball_size, 10, .lower, .{}, &size_writer);
-    try size.append('-');
-    req.?.extra_headers = &.{http.Header{ .name = "Range", .value = size.items }};
-
-    try req.?.send();
-    try req.?.wait();
-    var reader = req.?.reader();
-
-    var progress_bar: [52]u8 = undefined;
-    progress_bar[0] = '[';
-    @memset(progress_bar[1..50], ' ');
-    progress_bar[51] = ']';
-
-    var buff: [1024]u8 = undefined;
-    var dlnow: usize = tarball_size;
-    var bars: u8 = 0;
-    while (true) {
-        const len = try reader.read(&buff);
-        if (len == 0) {
-            break;
-        }
-        _ = try tb_writer.write(buff[0..len]);
-
-        dlnow += len;
-        const pcnt_complete: u8 = @intCast((dlnow * 100 / total_size));
-        var timer = try std.time.Timer.start();
-        const newbars: u8 = pcnt_complete / 2;
-
-        if (newbars > bars) {
-            @memset(progress_bar[bars..newbars], '|');
-            const dlspeed = @as(f64, @floatFromInt(dlnow)) / 1024 * 8 / @as(f64, @floatFromInt(timer.read()));
-            std.debug.print("\r\t{s} {d}% {d:.1}kb/s", .{ progress_bar, pcnt_complete, dlspeed });
-            bars = newbars;
-        }
-    }
-    std.debug.print("\n", .{});
-    try tb_writer.flush();
-}
-
-fn get_json_dslist(client: *Client) anyerror!JsonResponse {
-    std.log.info("Fetching the latest index", .{});
-    const uri = try std.Uri.parse("https://ziglang.org/download/index.json");
-
-    var req = make_request(client, uri);
-    defer req.?.deinit();
-    if (req == null) {
-        std.log.err("Failed fetching the index. Exitting (1)...", .{});
-        std.process.exit(1);
-    }
-
-    try req.?.send();
-    try req.?.wait();
-
-    var json_buff: [1024 * 100]u8 = undefined;
-    const bytes_read = try req.?.reader().readAll(&json_buff);
-
-    return JsonResponse{ .body = json_buff, .length = bytes_read };
-}
-
-fn make_request(client: *Client, uri: std.Uri) ?Client.Request {
-    var http_header_buff: [1024]u8 = undefined;
-    for (0..5) |i| {
-        const tryreq = client.open(
-            http.Method.GET,
-            uri,
-            Client.RequestOptions{ .server_header_buffer = &http_header_buff },
-        );
-        if (tryreq) |r| {
-            return r;
-        } else |err| {
-            std.log.warn("{}. Retrying again [{}/5]", .{ err, i + 1 });
-            std.time.sleep(std.time.ns_per_ms * 500);
-        }
-    }
-    return null;
 }
 
 fn show_info(alloc: Allocator, cp: CommonPaths) !void {
