@@ -80,39 +80,41 @@ fn install_release(alloc: Allocator, client: *Client, releases: json.Value, rel:
 
     const target = release.object.get(utils.target_name()) orelse return InstallError.TargetNotAvailable;
     const tarball_url = target.object.get("tarball").?.string;
-    const tarball_size = try std.fmt.parseInt(usize, target.object.get("size").?.string, 10);
+    const total_size = try std.fmt.parseInt(usize, target.object.get("size").?.string, 10);
 
     const tarball_dw_filename = try utils.dw_tarball_name(alloc, rel);
 
-    var try_tarball_file = cp.download_dir.openFile(tarball_dw_filename, .{});
+    // IMPORTANT: To continue downloading if the file isn't completely downloaded AKA partial downloading, we
+    // open the file with .truncate = false and then later move the file cursor to the end of the file using seekFromEnd().
+    // This is basically Zig's equivalent to *open in append mode*.
+    var tarball = try cp.download_dir.createFile(tarball_dw_filename, .{ .read = true, .truncate = false });
+    defer tarball.close();
+    const tarball_size = (try tarball.metadata()).size();
 
-    if (try_tarball_file == File.OpenError.FileNotFound) {
-        var tarball = try cp.download_dir.createFile(tarball_dw_filename, .{ .read = true });
-
+    if (tarball_size < total_size) {
+        try tarball.seekFromEnd(0);
         var tarball_writer = std.io.bufferedWriter(tarball.writer());
         try download_tarball(
+            alloc,
             client,
             tarball_url,
             &tarball_writer,
             tarball_size,
+            total_size,
         );
-        try_tarball_file = tarball;
         try tarball.seekTo(0);
     } else {
         std.log.info("Found already existing tarball, using that", .{});
     }
 
-    const tarball_file = try try_tarball_file;
-    defer tarball_file.close();
-
-    var tarball_reader = std.io.bufferedReader(tarball_file.reader());
+    var tarball_reader = std.io.bufferedReader(tarball.reader());
     const hash_matched = try utils.check_hash(target.object.get("shasum").?.string[0..64], tarball_reader.reader());
 
     if (!hash_matched) {
         std.log.err("Hashes do match for downloaded tarball. Exitting", .{});
         return error.BadChecksum;
     }
-    try tarball_file.seekTo(0);
+    try tarball.seekTo(0);
 
     std.log.info("Extracting {s}", .{tarball_dw_filename});
     try utils.extract_xz(alloc, cp, rel, tarball_reader.reader());
@@ -130,7 +132,7 @@ fn remove_release(alloc: Allocator, rel: Rel, cp: CommonPaths) !void {
     std.log.err("Removed {s}", .{release_dir});
 }
 
-fn download_tarball(client: *Client, tb_url: []const u8, tb_writer: anytype, total_size: usize) !void {
+fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, tb_writer: anytype, tarball_size: u64, total_size: usize) !void {
     std.log.info("Downloading {s}", .{tb_url});
     const tarball_uri = try std.Uri.parse(tb_url);
 
@@ -140,6 +142,14 @@ fn download_tarball(client: *Client, tb_url: []const u8, tb_writer: anytype, tot
         std.log.err("Failed fetching the install tarball. Exitting (1)...", .{});
         std.process.exit(1);
     }
+
+    // Attach the Range header for partial downloads
+    var size = std.ArrayList(u8).init(alloc);
+    try size.appendSlice("bytes=");
+    var size_writer = size.writer();
+    try std.fmt.formatInt(tarball_size, 10, .lower, .{}, &size_writer);
+    try size.append('-');
+    req.?.extra_headers = &.{http.Header{ .name = "Range", .value = size.items }};
 
     try req.?.send();
     try req.?.wait();
@@ -151,7 +161,7 @@ fn download_tarball(client: *Client, tb_url: []const u8, tb_writer: anytype, tot
     progress_bar[51] = ']';
 
     var buff: [1024]u8 = undefined;
-    var dlnow: usize = 0;
+    var dlnow: usize = tarball_size;
     var bars: u8 = 0;
     while (true) {
         const len = try reader.read(&buff);
