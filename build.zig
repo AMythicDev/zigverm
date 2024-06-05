@@ -1,4 +1,5 @@
 const std = @import("std");
+const Compile = std.Build.Step.Compile;
 
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
@@ -32,20 +33,52 @@ pub fn build(b: *std.Build) !void {
     b.installArtifact(zigvm);
     b.installArtifact(zig);
 
-    const run_cmd = b.addRunArtifact(zigvm);
-    run_cmd.step.dependOn(b.getInstallStep());
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
-    const run_step = b.step("run", "Run the app");
-    run_step.dependOn(&run_cmd.step);
+    addExeRunner(b, zigvm, zig);
+    addTestRunner(b, target, optimize);
+}
 
-    const exe_unit_tests = b.addTest(.{
+fn addExeRunner(b: *std.Build, zigvm: *Compile, zig: *Compile) void {
+    const run_zigvm = b.addRunArtifact(zigvm);
+    run_zigvm.step.dependOn(b.getInstallStep());
+    if (b.args) |args| {
+        run_zigvm.addArgs(args);
+    }
+    const run_zigvm_step = b.step("run-zigvm", "Run the app");
+    run_zigvm_step.dependOn(&run_zigvm.step);
+
+    const run_zig = b.addRunArtifact(zig);
+    run_zig.step.dependOn(b.getInstallStep());
+    if (b.args) |args| {
+        run_zig.addArgs(args);
+    }
+    const run_zig_step = b.step("run-zig", "Run the app");
+    run_zig_step.dependOn(&run_zig.step);
+}
+
+fn addTestRunner(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
+    const zigvm_tests = b.addTest(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
-    const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
+    const run_zigvm_tests = b.addRunArtifact(zigvm_tests);
+
+    const zig_tests = b.addTest(.{
+        .root_source_file = b.path("src/zig/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const run_zig_tests = b.addRunArtifact(zig_tests);
+
+    const common_tests = b.addTest(.{
+        .root_source_file = b.path("src/common/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const run_common_tests = b.addRunArtifact(common_tests);
+
     const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&run_exe_unit_tests.step);
+    test_step.dependOn(&run_zigvm_tests.step);
+    test_step.dependOn(&run_zig_tests.step);
+    test_step.dependOn(&run_common_tests.step);
 }
