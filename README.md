@@ -73,7 +73,7 @@ zig build --release=safe
 
 ## Features
 - [x] Install versions (master, stable, x.y.z)
-- [x] Support continue download if previously interrupted
+- [x] Continue download if previously interrupted
 - [x] Remove versions
 - [x] List down installed versions
 - [x] Manage default and per-directory version overrides
