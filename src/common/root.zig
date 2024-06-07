@@ -24,8 +24,8 @@ pub const Rel = struct {
 
     pub fn actualVersion(self: Self, alloc: Allocator) RelError![]const u8 {
         switch (self.release) {
-            ReleaseSpec.Master => return "master",
-            ReleaseSpec.FullVersionSpec => |v| return v,
+            ReleaseSpec.Master => return try alloc.dupe(u8, "master"),
+            ReleaseSpec.FullVersionSpec => |v| return try alloc.dupe(u8, v),
             else => {
                 if (self.actual_version == null) @panic("actual_version() called without resolving");
                 var buffer = std.ArrayList(u8).init(alloc);
