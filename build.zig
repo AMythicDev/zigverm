@@ -5,7 +5,7 @@ pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const common = b.createModule(.{ .root_source_file = .{ .path = "src/common/root.zig" } });
+    const common = b.createModule(.{ .root_source_file = b.path("src/common/root.zig") });
     const default_os = target.result.os.tag;
     if (default_os.isBSD() or default_os.isDarwin() or default_os == std.Target.Os.Tag.linux) {
         common.link_libc = true;

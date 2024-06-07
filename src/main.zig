@@ -93,7 +93,7 @@ fn show_info(alloc: Allocator, cp: CommonPaths) !void {
 
 fn override(alloc: Allocator, cp: CommonPaths, rel: Rel, directory: []const u8) !void {
     var overrides = try common.overrides.read_overrides(alloc, cp);
-    try overrides.put(directory, json.Value{ .string = rel.as_string() });
+    try overrides.put(directory, json.Value{ .string = rel.releaseName() });
     try common.overrides.write_overrides(overrides, cp);
 }
 

@@ -9,72 +9,94 @@ pub const default_os = builtin.target.os.tag;
 pub const default_arch = builtin.target.cpu.arch;
 
 const RelError = error{
-    InvalidVersion,
+    InvalidVersionSpec,
+    Overflow,
+    OutOfMemory,
 };
 
-pub const Rel = union(enum) {
-    Master,
-    Stable: ?[]const u8,
-    Version: []const u8,
+pub const ReleaseSpec = union(enum) { Master, Stable, VersionSpec: []const u8 };
+
+pub const Rel = struct {
+    release: ReleaseSpec,
+    actual_version: ?std.SemanticVersion = null,
 
     const Self = @This();
 
-    pub fn version(self: Self) []const u8 {
-        switch (self) {
-            Rel.Master => return "master",
-            Rel.Stable => |ver| {
-                if (ver) |v| {
-                    return v;
-                } else {
-                    @panic("Rel.version() called when Rel.Stable is not resolved");
-                }
+    pub fn actualVersion(self: Self, alloc: Allocator) RelError![]const u8 {
+        switch (self.release) {
+            ReleaseSpec.Master => return "master",
+            else => {
+                if (self.actual_version == null) @panic("actual_version() called without resolving");
+                var buffer = std.ArrayList(u8).init(alloc);
+                defer buffer.deinit();
+                try self.actual_version.?.format("", .{}, buffer.writer());
+                return try alloc.dupe(u8, buffer.items);
             },
-            Rel.Version => |v| return v,
         }
     }
 
-    pub fn as_string(self: Self) []const u8 {
-        switch (self) {
-            Rel.Master => return "master",
-            Rel.Version => |v| return v,
-            Rel.Stable => return "stable",
+    pub fn releaseName(self: Self) []const u8 {
+        switch (self.release) {
+            ReleaseSpec.Master => return "master",
+            ReleaseSpec.VersionSpec => |v| return v,
+            ReleaseSpec.FullVersionSpec => |v| return v,
+            ReleaseSpec.Stable => return "stable",
         }
     }
 
-    fn resolve_stable_release(alloc: Allocator, releases: json.Value) std.ArrayList(u8) {
-        var buf = std.ArrayList(u8).init(alloc);
-        var stable: ?std.SemanticVersion = null;
+    pub fn resolve(self: *Self, releases: json.Value) RelError!void {
+        if (self.release == ReleaseSpec.Master) return;
+
+        var base_spec: std.SemanticVersion = undefined;
+        if (self.release == .Stable) {
+            base_spec = std.SemanticVersion{ .major = 0, .minor = 0, .patch = 0 };
+        } else {
+            base_spec = try Self.completeSpec(self.release.VersionSpec);
+        }
+
         for (releases.object.keys()) |release| {
             if (streql(release, "master")) continue;
+
             var r = std.SemanticVersion.parse(release) catch unreachable;
-            if (stable == null) {
-                stable = r;
+
+            if (self.release == .VersionSpec and (base_spec.major != r.major or base_spec.minor != r.minor)) continue;
+
+            if (self.actual_version == null) {
+                self.actual_version = r;
                 continue;
             }
-            if (r.order(stable.?) == std.math.Order.gt) {
-                stable = r;
+
+            if (r.order(self.actual_version.?) == std.math.Order.gt) {
+                self.actual_version = r;
             }
         }
-        stable.?.format("", .{}, buf.writer()) catch unreachable;
-        return buf;
     }
 
-    pub fn releasefromVersion(alloc: Allocator, releases: ?json.Value, v: []const u8) RelError!Self {
+    pub fn releasefromVersion(v: []const u8) RelError!Self {
         var rel: Rel = undefined;
-        if (streql(v, "master")) {
-            rel = Rel.Master;
-        } else if (streql(v, "stable")) {
-            if (releases) |r| {
-                rel = Rel{ .Stable = Rel.resolve_stable_release(alloc, r).items };
-            } else {
-                rel = Rel{ .Stable = null };
-            }
-        } else if (std.SemanticVersion.parse(v)) |_| {
-            rel = Rel{ .Version = v };
-        } else |_| {
-            return RelError.InvalidVersion;
+        if (streql(v, "master"))
+            rel = Self{ .release = .Master }
+        else if (streql(v, "stable"))
+            rel = Self{ .release = .Stable }
+        else {
+            const is_valid_version = completeSpec(v);
+            if (is_valid_version) |_| {
+                rel = Self{ .release = ReleaseSpec{ .VersionSpec = v } };
+            } else |_| _ = try is_valid_version;
         }
         return rel;
+    }
+
+    inline fn completeSpec(spec: []const u8) RelError!std.SemanticVersion {
+        const count = std.mem.count(u8, spec, ".");
+        var buffer = try std.BoundedArray(u8, 24).fromSlice(spec);
+
+        if (count == 2)
+            return std.SemanticVersion.parse(spec) catch return RelError.InvalidVersionSpec
+        else if (count == 1) {
+            try buffer.appendSlice(".0");
+            return std.SemanticVersion.parse(buffer.slice()) catch return RelError.InvalidVersionSpec;
+        } else return RelError.InvalidVersionSpec;
     }
 };
 
@@ -87,7 +109,12 @@ pub fn streql(cmd: []const u8, key: []const u8) bool {
 }
 
 pub fn release_name(alloc: Allocator, rel: Rel) ![]const u8 {
-    const release_string = rel.as_string();
+    const release_string = rel.releaseName();
     const dw_target = comptime target_name();
     return try std.mem.concat(alloc, u8, &[_][]const u8{ "zig-" ++ dw_target ++ "-", release_string });
 }
+
+usingnamespace if (builtin.is_test)
+    @import("tests.zig")
+else
+    struct {};

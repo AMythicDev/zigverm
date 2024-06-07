@@ -32,7 +32,7 @@ pub fn install_release(alloc: Allocator, client: *Client, version: []const u8, c
     const releases = try json.parseFromSliceLeaky(json.Value, alloc, resp.body[0..resp.length], .{});
     const rel = try Rel.releasefromVersion(alloc, releases, version);
 
-    var release: json.Value = releases.object.get(rel.version()).?;
+    var release: json.Value = releases.object.get(rel.actual_version()).?;
 
     const target = release.object.get(target_name()) orelse return InstallError.TargetNotAvailable;
     const tarball_url = target.object.get("tarball").?.string;
@@ -198,7 +198,7 @@ pub fn target_name() []const u8 {
 }
 
 pub fn dw_tarball_name(alloc: Allocator, rel: Rel) ![]const u8 {
-    const release_string = rel.as_string();
+    const release_string = rel.releaseName();
     const dw_target = comptime target_name();
     return try std.mem.concat(alloc, u8, &[_][]const u8{ "zig-" ++ dw_target ++ "-", release_string, ".tar.xz.partial" });
 }
