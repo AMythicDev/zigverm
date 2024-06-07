@@ -14,7 +14,7 @@ const RelError = error{
     OutOfMemory,
 };
 
-pub const ReleaseSpec = union(enum) { Master, Stable, VersionSpec: []const u8 };
+pub const ReleaseSpec = union(enum) { Master, Stable, MajorMinorVersionSpec: []const u8, FullVersionSpec: []const u8 };
 
 pub const Rel = struct {
     release: ReleaseSpec,
@@ -25,6 +25,7 @@ pub const Rel = struct {
     pub fn actualVersion(self: Self, alloc: Allocator) RelError![]const u8 {
         switch (self.release) {
             ReleaseSpec.Master => return "master",
+            ReleaseSpec.FullVersionSpec => |v| return v,
             else => {
                 if (self.actual_version == null) @panic("actual_version() called without resolving");
                 var buffer = std.ArrayList(u8).init(alloc);
@@ -38,19 +39,20 @@ pub const Rel = struct {
     pub fn releaseName(self: Self) []const u8 {
         switch (self.release) {
             ReleaseSpec.Master => return "master",
-            ReleaseSpec.VersionSpec => |v| return v,
+            ReleaseSpec.MajorMinorVersionSpec => |v| return v,
+            ReleaseSpec.FullVersionSpec => |v| return v,
             ReleaseSpec.Stable => return "stable",
         }
     }
 
     pub fn resolve(self: *Self, releases: json.Value) RelError!void {
-        if (self.release == ReleaseSpec.Master) return;
+        if (self.release == ReleaseSpec.Master or self.release == ReleaseSpec.FullVersionSpec) return;
 
         var base_spec: std.SemanticVersion = undefined;
         if (self.release == .Stable) {
             base_spec = std.SemanticVersion{ .major = 0, .minor = 0, .patch = 0 };
         } else {
-            base_spec = try Self.completeSpec(self.release.VersionSpec);
+            base_spec = try Self.completeSpec(self.release.MajorMinorVersionSpec);
         }
 
         for (releases.object.keys()) |release| {
@@ -58,7 +60,7 @@ pub const Rel = struct {
 
             var r = std.SemanticVersion.parse(release) catch unreachable;
 
-            if (self.release == .VersionSpec and (base_spec.major != r.major or base_spec.minor != r.minor)) continue;
+            if (self.release == .MajorMinorVersionSpec and (base_spec.major != r.major or base_spec.minor != r.minor)) continue;
 
             if (self.actual_version == null) {
                 self.actual_version = r;
@@ -77,10 +79,16 @@ pub const Rel = struct {
             rel = Self{ .release = .Master }
         else if (streql(v, "stable"))
             rel = Self{ .release = .Stable }
-        else {
+        else b: {
+            const count = std.mem.count(u8, v, ".");
+            if (count == 2) {
+                rel = Self{ .release = ReleaseSpec{ .FullVersionSpec = v }, .actual_version = std.SemanticVersion.parse(v) catch return RelError.InvalidVersionSpec };
+                break :b;
+            }
+
             const is_valid_version = completeSpec(v);
             if (is_valid_version) |_| {
-                rel = Self{ .release = ReleaseSpec{ .VersionSpec = v } };
+                rel = Self{ .release = ReleaseSpec{ .MajorMinorVersionSpec = v } };
             } else |_| _ = try is_valid_version;
         }
         return rel;
