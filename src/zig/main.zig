@@ -16,7 +16,7 @@ pub fn main() !void {
     const zig_path = try std.fs.path.join(alloc, &.{
         common.paths.CommonPaths.get_zigvm_root(),
         "installs/",
-        try common.release_name(alloc, try common.Rel.releasefromVersion(alloc, null, best_match)),
+        try common.release_name(alloc, try common.Rel.releasefromVersion(best_match)),
         "zig",
     });
 

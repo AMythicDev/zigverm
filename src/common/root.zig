@@ -39,7 +39,6 @@ pub const Rel = struct {
         switch (self.release) {
             ReleaseSpec.Master => return "master",
             ReleaseSpec.VersionSpec => |v| return v,
-            ReleaseSpec.FullVersionSpec => |v| return v,
             ReleaseSpec.Stable => return "stable",
         }
     }

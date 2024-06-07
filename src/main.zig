@@ -31,15 +31,22 @@ pub fn main() !void {
             var client = Client{ .allocator = alloc };
             defer client.deinit();
 
-            if (!(try utils.check_not_installed(alloc, try Rel.releasefromVersion(alloc, null, version), cp))) {
+            var rel = try Rel.releasefromVersion(version);
+
+            if (!(try utils.check_not_installed(alloc, rel, cp))) {
                 std.log.err("Version already installled. Quitting", .{});
                 std.process.exit(0);
             }
 
-            try install.install_release(alloc, &client, version, cp);
+            const resp = try install.get_json_dslist(&client);
+            const releases = try json.parseFromSliceLeaky(json.Value, alloc, resp.body[0..resp.length], .{});
+
+            try rel.resolve(releases);
+
+            try install.install_release(alloc, &client, rel, releases, cp);
         },
         Cli.remove => |version| {
-            const rel = try Rel.releasefromVersion(alloc, null, version);
+            const rel = try Rel.releasefromVersion(version);
             try remove_release(alloc, rel, cp);
         },
         Cli.show => {
@@ -47,7 +54,7 @@ pub fn main() !void {
         },
         Cli.override => |oa| {
             var override_args = oa;
-            const rel = try Rel.releasefromVersion(alloc, null, override_args.version);
+            const rel = try Rel.releasefromVersion(override_args.version);
             if (override_args.directory != null and !streql(override_args.directory.?, "default")) {
                 override_args.directory = try std.fs.realpathAlloc(alloc, override_args.directory.?);
             }

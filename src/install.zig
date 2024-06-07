@@ -27,13 +27,8 @@ const InstallError = error{
     TargetNotAvailable,
 };
 
-pub fn install_release(alloc: Allocator, client: *Client, version: []const u8, cp: CommonPaths) !void {
-    const resp = try get_json_dslist(client);
-    const releases = try json.parseFromSliceLeaky(json.Value, alloc, resp.body[0..resp.length], .{});
-    const rel = try Rel.releasefromVersion(alloc, releases, version);
-
-    var release: json.Value = releases.object.get(rel.actual_version()).?;
-
+pub fn install_release(alloc: Allocator, client: *Client, rel: Rel, releases: json.Value, cp: CommonPaths) !void {
+    const release: json.Value = releases.object.get(try rel.actualVersion(alloc)).?;
     const target = release.object.get(target_name()) orelse return InstallError.TargetNotAvailable;
     const tarball_url = target.object.get("tarball").?.string;
     const total_size = try std.fmt.parseInt(usize, target.object.get("size").?.string, 10);
@@ -132,7 +127,7 @@ fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, tb_wr
     try tb_writer.flush();
 }
 
-fn get_json_dslist(client: *Client) anyerror!JsonResponse {
+pub fn get_json_dslist(client: *Client) anyerror!JsonResponse {
     std.log.info("Fetching the latest index", .{});
     const uri = try std.Uri.parse("https://ziglang.org/download/index.json");
 
