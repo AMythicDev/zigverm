@@ -25,7 +25,7 @@ pub fn check_install_name(name: []const u8) bool {
         return false;
     }
     const version = components.next() orelse return false;
-    const sv = if (std.SemanticVersion.parse(version)) |_| true else |_| false;
+    const sv = if (common.Rel.completeSpec(version)) |_| true else |_| false;
     if (!streql(version, "stable") and !streql(version, "master") and !sv) {
         return false;
     }
