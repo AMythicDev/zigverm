@@ -61,9 +61,37 @@ pub fn main() !void {
             const directory = dir orelse try std.process.getCwdAlloc(alloc);
             try override_rm(alloc, cp, directory);
         },
-        Cli.update => |version| {
-            if (version == null) @panic("Updating all versions is not supported yet");
-            try update_version(alloc, version.?, cp);
+        Cli.update => |version_possible| {
+            var versions: [][]const u8 = undefined;
+            var check_installed = false;
+            if (version_possible) |v| {
+                versions = @constCast(&[1][]const u8{v});
+                check_installed = true;
+            } else versions = try installed_versions(alloc, cp);
+
+            var uptodate = std.ArrayList([]const u8).init(alloc);
+            var client = Client{ .allocator = alloc };
+            defer client.deinit();
+            const resp = try install.get_json_dslist(&client);
+            const releases = try json.parseFromSliceLeaky(json.Value, alloc, resp.body[0..resp.length], .{});
+
+            for (versions) |v| {
+                var rel = try Rel.releasefromVersion(v);
+                if (check_installed and try utils.check_not_installed(alloc, rel, cp)) {
+                    try install.install_release(alloc, &client, releases, &rel, cp);
+                    return;
+                }
+                if (rel.release == common.ReleaseSpec.FullVersionSpec) {
+                    try uptodate.append(v);
+                    continue;
+                }
+                try install.install_release(alloc, &client, releases, &rel, cp);
+            }
+
+            std.debug.print("\n", .{});
+            for (uptodate.items) |v| {
+                std.debug.print("\t{s}    :    Up to date\n", .{v});
+            }
         },
     }
 }
@@ -110,22 +138,16 @@ fn override_rm(alloc: Allocator, cp: CommonPaths, directory: []const u8) !void {
     try common.overrides.write_overrides(overrides, cp);
 }
 
-fn update_version(alloc: Allocator, version: []const u8, cp: CommonPaths) !void {
-    var rel = try Rel.releasefromVersion(version);
-
-    // Find updated patch release by resolving
-    var client = Client{ .allocator = alloc };
-    defer client.deinit();
-    const resp = try install.get_json_dslist(&client);
-    const releases = try json.parseFromSliceLeaky(json.Value, alloc, resp.body[0..resp.length], .{});
-
-    if (try utils.check_not_installed(alloc, rel, cp)) {
-        try install.install_release(alloc, &client, releases, &rel, cp);
-        return;
+fn installed_versions(alloc: Allocator, cp: CommonPaths) ![][]const u8 {
+    var iter = cp.install_dir.iterate();
+    var versions = std.ArrayList([]const u8).init(alloc);
+    while (try iter.next()) |i| {
+        if (!utils.check_install_name(i.name)) continue;
+        var components = std.mem.split(u8, i.name[4..], "-");
+        _ = components.next();
+        _ = components.next();
+        const version = components.next() orelse unreachable;
+        try versions.append(try alloc.dupe(u8, version));
     }
-
-    if (rel.release == common.ReleaseSpec.FullVersionSpec)
-        std.debug.print("\t{s}    :    Up to date\n", .{version});
-
-    try install.install_release(alloc, &client, releases, &rel, cp);
+    return versions.items;
 }

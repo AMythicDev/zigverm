@@ -68,8 +68,8 @@ pub const Cli = union(enum) {
             const rel = arg_iter.next().?;
             command = Cli{ .remove = try alloc.dupe(u8, rel) };
         } else if (streql(cmd, "update")) {
-            const rel = arg_iter.next().?;
-            command = Cli{ .update = try alloc.dupe(u8, rel) };
+            const rel = arg_iter.next();
+            command = Cli{ .update = if (rel) |r| try alloc.dupe(u8, r) else null };
         } else if (streql(cmd, "info")) {
             command = Cli.show;
         } else if (streql(cmd, "-h") or streql(cmd, "--help")) {
