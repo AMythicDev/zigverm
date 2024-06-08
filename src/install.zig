@@ -88,12 +88,14 @@ fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, tb_wr
     }
 
     // Attach the Range header for partial downloads
-    var size = std.ArrayList(u8).init(alloc);
-    try size.appendSlice("bytes=");
-    var size_writer = size.writer();
-    try std.fmt.formatInt(tarball_size, 10, .lower, .{}, &size_writer);
-    try size.append('-');
-    req.?.extra_headers = &.{http.Header{ .name = "Range", .value = size.items }};
+    if (tarball_size > 0) {
+        var size = std.ArrayList(u8).init(alloc);
+        try size.appendSlice("bytes=");
+        var size_writer = size.writer();
+        try std.fmt.formatInt(tarball_size, 10, .lower, .{}, &size_writer);
+        try size.append('-');
+        req.?.extra_headers = &.{http.Header{ .name = "Range", .value = size.items }};
+    }
 
     try req.?.send();
     try req.?.wait();
