@@ -27,13 +27,15 @@ const InstallError = error{
     TargetNotAvailable,
 };
 
-pub fn install_release(alloc: Allocator, client: *Client, rel: Rel, releases: json.Value, cp: CommonPaths) !void {
+pub fn install_release(alloc: Allocator, client: *Client, releases: json.Value, rel: *Rel, cp: CommonPaths) !void {
+    try rel.resolve(releases);
+
     const release: json.Value = releases.object.get(try rel.actualVersion(alloc)).?;
     const target = release.object.get(target_name()) orelse return InstallError.TargetNotAvailable;
     const tarball_url = target.object.get("tarball").?.string;
     const total_size = try std.fmt.parseInt(usize, target.object.get("size").?.string, 10);
 
-    const tarball_dw_filename = try dw_tarball_name(alloc, rel);
+    const tarball_dw_filename = try dw_tarball_name(alloc, rel.*);
 
     // IMPORTANT: To continue downloading if the file isn't completely downloaded AKA partial downloading, we
     // open the file with .truncate = false and then later move the file cursor to the end of the file using seekFromEnd().
@@ -68,7 +70,8 @@ pub fn install_release(alloc: Allocator, client: *Client, rel: Rel, releases: js
     try tarball.seekTo(0);
 
     std.log.info("Extracting {s}", .{tarball_dw_filename});
-    try extract_xz(alloc, cp, rel, tarball_reader.reader());
+    try cp.install_dir.deleteTree(try release_name(alloc, rel.*));
+    try extract_xz(alloc, cp, rel.*, tarball_reader.reader());
 
     try cp.download_dir.deleteFile(tarball_dw_filename);
 }
@@ -182,7 +185,7 @@ pub fn check_hash(hashstr: *const [64]u8, reader: anytype) !bool {
     return std.mem.eql(u8, &hasher.finalResult(), &hash);
 }
 
-pub fn extract_xz(alloc: Allocator, dirs: CommonPaths, rel: Rel, reader: anytype) !void {
+inline fn extract_xz(alloc: Allocator, dirs: CommonPaths, rel: Rel, reader: anytype) !void {
     var xz = try std.compress.xz.decompress(alloc, reader);
     const release_dir = try dirs.install_dir.makeOpenPath(try release_name(alloc, rel), .{});
     try std.tar.pipeToFileSystem(release_dir, xz.reader(), .{ .strip_components = 1 });

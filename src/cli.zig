@@ -14,11 +14,13 @@ const helptext =
     \\      override [DIRECTORY] <version>      Override the version of zig used under DIRECTORY. DIRECTORY can be
     \\                                              - Path to a directory, under which to override
     \\                                              - "default", to change the default version
-    \\                                              - An empty string to use the current directory
-    \\      override-rm [DIRECTORY]            Override the version of zig used under DIRECTORY. DIRECTORY can be
+    \\                                              - ommited to use the current directory
+    \\      override-rm [DIRECTORY]             Override the version of zig used under DIRECTORY. DIRECTORY can be
     \\                                              - Path to a directory, under which to override
     \\                                              - "default", to change the default version
     \\                                              - An empty string to use the current directory
+    \\      update [VERSION]                    Update version to its latest available point release, If [VERSION] is
+    \\                                          not provided, it will update all installed versions
     \\      remove <version>                    Remove a already installed specific version. Version can be any 
     \\                                          valid semantic version or master or stable
     \\      info                                Show information about installations
@@ -39,6 +41,7 @@ pub const Cli = union(enum) {
     show,
     override: OverrideArrgs,
     override_rm: ?[]const u8,
+    update: ?[]const u8,
 
     pub fn read_args(alloc: Allocator) anyerror!Cli {
         var arg_iter = try std.process.argsWithAllocator(alloc);
@@ -64,6 +67,9 @@ pub const Cli = union(enum) {
         } else if (streql(cmd, "remove")) {
             const rel = arg_iter.next().?;
             command = Cli{ .remove = try alloc.dupe(u8, rel) };
+        } else if (streql(cmd, "update")) {
+            const rel = arg_iter.next().?;
+            command = Cli{ .update = try alloc.dupe(u8, rel) };
         } else if (streql(cmd, "info")) {
             command = Cli.show;
         } else if (streql(cmd, "-h") or streql(cmd, "--help")) {

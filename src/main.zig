@@ -3,10 +3,9 @@ const utils = @import("utils.zig");
 const builtin = @import("builtin");
 const Cli = @import("cli.zig").Cli;
 const common = @import("common");
+const Client = std.http.Client;
 
 const paths = common.paths;
-const http = std.http;
-const Client = std.http.Client;
 const json = std.json;
 const File = std.fs.File;
 const Allocator = std.mem.Allocator;
@@ -28,22 +27,19 @@ pub fn main() !void {
 
     switch (command) {
         Cli.install => |version| {
-            var client = Client{ .allocator = alloc };
-            defer client.deinit();
-
             var rel = try Rel.releasefromVersion(version);
-
             if (!(try utils.check_not_installed(alloc, rel, cp))) {
                 std.log.err("Version already installled. Quitting", .{});
                 std.process.exit(0);
             }
 
+            var client = Client{ .allocator = alloc };
+            defer client.deinit();
+
             const resp = try install.get_json_dslist(&client);
             const releases = try json.parseFromSliceLeaky(json.Value, alloc, resp.body[0..resp.length], .{});
 
-            try rel.resolve(releases);
-
-            try install.install_release(alloc, &client, rel, releases, cp);
+            try install.install_release(alloc, &client, releases, &rel, cp);
         },
         Cli.remove => |version| {
             const rel = try Rel.releasefromVersion(version);
@@ -64,6 +60,10 @@ pub fn main() !void {
         Cli.override_rm => |dir| {
             const directory = dir orelse try std.process.getCwdAlloc(alloc);
             try override_rm(alloc, cp, directory);
+        },
+        Cli.update => |version| {
+            if (version == null) @panic("Updating all versions is not supported yet");
+            try update_version(alloc, version.?, cp);
         },
     }
 }
@@ -108,4 +108,24 @@ fn override_rm(alloc: Allocator, cp: CommonPaths, directory: []const u8) !void {
     var overrides = try common.overrides.read_overrides(alloc, cp);
     _ = overrides.orderedRemove(directory);
     try common.overrides.write_overrides(overrides, cp);
+}
+
+fn update_version(alloc: Allocator, version: []const u8, cp: CommonPaths) !void {
+    var rel = try Rel.releasefromVersion(version);
+
+    // Find updated patch release by resolving
+    var client = Client{ .allocator = alloc };
+    defer client.deinit();
+    const resp = try install.get_json_dslist(&client);
+    const releases = try json.parseFromSliceLeaky(json.Value, alloc, resp.body[0..resp.length], .{});
+
+    if (try utils.check_not_installed(alloc, rel, cp)) {
+        try install.install_release(alloc, &client, releases, &rel, cp);
+        return;
+    }
+
+    if (rel.release == common.ReleaseSpec.FullVersionSpec)
+        std.debug.print("\t{s}    :    Up to date\n", .{version});
+
+    try install.install_release(alloc, &client, releases, &rel, cp);
 }

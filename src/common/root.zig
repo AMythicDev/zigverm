@@ -94,7 +94,7 @@ pub const Rel = struct {
         return rel;
     }
 
-    inline fn completeSpec(spec: []const u8) RelError!std.SemanticVersion {
+    pub inline fn completeSpec(spec: []const u8) RelError!std.SemanticVersion {
         const count = std.mem.count(u8, spec, ".");
         var buffer = try std.BoundedArray(u8, 24).fromSlice(spec);
 
