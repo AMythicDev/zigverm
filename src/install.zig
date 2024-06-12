@@ -101,10 +101,7 @@ fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, tb_wr
     try req.?.wait();
     var reader = req.?.reader();
 
-    var progress_bar: [52]u8 = undefined;
-    progress_bar[0] = '[';
-    @memset(progress_bar[1..50], ' ');
-    progress_bar[51] = ']';
+    var progress_bar: [150]u8 = ("░" ** 50).*;
 
     var buff: [1024]u8 = undefined;
     var dlnow: u64 = tarball_size;
@@ -122,9 +119,11 @@ fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, tb_wr
         const newbars: u8 = pcnt_complete / 2;
 
         if (newbars > bars) {
-            @memset(progress_bar[bars..newbars], '|');
+            for (bars..newbars) |i| {
+                std.mem.copyForwards(u8, progress_bar[i * 3 .. i * 3 + 3], "█");
+            }
             const dlspeed = @as(f64, @floatFromInt(dlnow)) / 1024 * 8 / @as(f64, @floatFromInt(timer.read()));
-            std.debug.print("\r\t{s} {d}% {d:.1}kb/s", .{ progress_bar, pcnt_complete, dlspeed });
+            std.debug.print("\r\t\x1b[33m{s}\x1b[0m{s} {d}% {d:.1}kb/s", .{ progress_bar[0 .. newbars * 3], progress_bar[newbars * 3 ..], pcnt_complete, dlspeed });
             bars = newbars;
         }
     }
