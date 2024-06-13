@@ -1,6 +1,6 @@
 #!/bin/sh
 
-VERSION = "0.2.0"
+VERSION="0.2.0"
 
 if [[ -z $ZIGVM_ROOT_DIR ]]; then
   ZIGVM_ROOT_DIR=$HOME/.zigvm
