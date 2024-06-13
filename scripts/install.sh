@@ -1,5 +1,7 @@
 #!/bin/sh
 
+VERSION = "0.2.0"
+
 if [[ -z $ZIGVM_ROOT_DIR ]]; then
   ZIGVM_ROOT_DIR=$HOME/.zigvm
 fi
@@ -14,15 +16,18 @@ mkdir -p $ZIGVM_ROOT_DIR/{downloads,installs,bin}
 OS=$(uname -s | awk '{print tolower($0)}')
 ARCH=$(uname -m | awk '{print tolower($0)}')
 
-curl -L https://github.com/AMythicDev/zigvm/releases/download/v0.1.0/zigvm-0.1.0-${ARCH}-${OS}.zip > /tmp/zigvm.zip
-unzip /tmp/zigvm.zip -d $ZIGVM_ROOT_DIR/bin/ 
+curl -L https://github.com/AMythicDev/zigvm/releases/download/v${VERSION}/zigvm-${VERSION}-${ARCH}-${OS}.zip > /tmp/zigvm.zip
+unzip /tmp/zigvm.zip -d /tmp/
+
+mv /tmp/zigvm-${VERSION}-${ARCH}-${OS}/zigvm $ZIGVM_ROOT_DIR/bin
+mv /tmp/zigvm-${VERSION}-${ARCH}-${OS}/zig $ZIGVM_ROOT_DIR/bin
 
 echo "Installing zig stable"
 $ZIGVM_ROOT_DIR/bin/zigvm install stable
 echo "Setting default version to stable"
 $ZIGVM_ROOT_DIR/bin/zigvm override default stable
 
-DEFAULT_SHELL=$(getent passwd arijit | awk -F: '{ print($NF) } ' | awk -F/ '{ print ($NF) }')
+DEFAULT_SHELL=$(getent passwd $USER | awk -F: '{ print($NF) } ' | awk -F/ '{ print ($NF) }')
 
 case $DEFAULT_SHELL in
   "bash")

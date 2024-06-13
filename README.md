@@ -72,7 +72,7 @@ zig build --release=safe
 - Lastly follow the same steps [for windows](#for-windows) 
 
 ## Features
-- [x] Install versions (master, stable, x.y.z)
+- [x] Install versions (master, stable, x.y x.y.z)
 - [x] Continue download if previously interrupted
 - [x] Remove versions
 - [x] List down installed versions

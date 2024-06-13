@@ -12,6 +12,7 @@ This file documents all changes made to the project and is updated before each r
 ## Fixed
 - Fixed the zig executable not propagating the correct exit code of the child zig executable.
 - Fix removing a release prints a error log on success.
+- Fix automatic install script cannot find shell.
 
 ## v0.1.0 [2024-05-27]
 - Initial release with preliminary support
