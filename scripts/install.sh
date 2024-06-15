@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 VERSION="0.2.0"
 
 if [[ -z $ZIGVM_ROOT_DIR ]]; then
