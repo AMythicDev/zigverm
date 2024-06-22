@@ -18,7 +18,7 @@ pub fn read_overrides(alloc: Allocator, cp: CommonPaths) !StringArrayHashMap(jso
     if (try file_reader.read(&buff) != 0) {
         try cp.overrides.seekTo(0);
         var json_reader = json.reader(alloc, file_reader);
-        overrides = (try json.parseFromTokenSourceLeaky(json.Value, alloc, &json_reader, .{})).object;
+        overrides = (try json.parseFromTokenSource(json.Value, alloc, &json_reader, .{})).value.object;
     } else {
         overrides = std.StringArrayHashMap(json.Value).init(alloc);
     }
@@ -42,13 +42,14 @@ pub fn write_overrides(overrides: StringArrayHashMap(json.Value), cp: CommonPath
 
 pub fn active_version(alloc: Allocator, cp: CommonPaths, dir_to_check: []const u8) !struct { from: []const u8, ver: []const u8 } {
     var from = dir_to_check;
-    const overrides = try read_overrides(alloc, cp);
+    var overrides = try read_overrides(alloc, cp);
+    defer overrides.deinit();
 
     var best_match: ?[]const u8 = null;
 
     while (true) {
         if (overrides.get(from)) |val| {
-            best_match = val.string;
+            best_match = try alloc.dupe(u8, val.string);
             break;
         } else {
             const next_dir_to_check = std.fs.path.dirname(from);
@@ -61,7 +62,7 @@ pub fn active_version(alloc: Allocator, cp: CommonPaths, dir_to_check: []const u
     }
 
     if (best_match == null) {
-        best_match = overrides.get("default").?.string;
+        best_match = try alloc.dupe(u8, overrides.get("default").?.string);
         from = "default";
     }
 
