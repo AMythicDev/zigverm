@@ -21,6 +21,12 @@ const helptext =
     \\                                              - An empty string to use the current directory
     \\      update [VERSION]                    Update version to its latest available point release, If [VERSION] is
     \\                                          not provided, it will update all installed versions
+    \\      std [VERSION]                       Open the standard library documentation in the default web browser.
+    \\                                          If [VERSION] is specified, it will open the documentation for that version
+    \\                                          otherwise it will default to of the active version on the current directory.
+    \\      reference [VERSION]                 Open the language reference in the default web browser.
+    \\                                          If [VERSION] is specified, it will open the reference for that version
+    \\                                          otherwise it will default to of the active version on the current directory.
     \\      remove <version>                    Remove a already installed specific version. Version can be any 
     \\                                          valid semantic version or master or stable
     \\      info                                Show information about installations
@@ -42,6 +48,8 @@ pub const Cli = union(enum) {
     override: OverrideArrgs,
     override_rm: ?[]const u8,
     update: ?[]const u8,
+    std: ?[]const u8,
+    reference: ?[]const u8,
 
     pub fn read_args(alloc: Allocator) anyerror!Cli {
         var arg_iter = try std.process.argsWithAllocator(alloc);
@@ -70,6 +78,12 @@ pub const Cli = union(enum) {
         } else if (streql(cmd, "update")) {
             const rel = arg_iter.next();
             command = Cli{ .update = if (rel) |r| try alloc.dupe(u8, r) else null };
+        } else if (streql(cmd, "std")) {
+            const rel = arg_iter.next();
+            command = Cli{ .std = if (rel) |r| try alloc.dupe(u8, r) else null };
+        } else if (streql(cmd, "reference")) {
+            const rel = arg_iter.next();
+            command = Cli{ .reference = if (rel) |r| try alloc.dupe(u8, r) else null };
         } else if (streql(cmd, "info")) {
             command = Cli.show;
         } else if (streql(cmd, "-h") or streql(cmd, "--help")) {

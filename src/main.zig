@@ -45,8 +45,58 @@ pub fn main() !void {
             const rel = try Rel.releasefromVersion(version);
             try remove_release(alloc, rel, cp);
         },
-        Cli.show => {
-            try show_info(alloc, cp);
+        Cli.show => try show_info(alloc, cp),
+        Cli.std => |ver| {
+            var best_match: []const u8 = undefined;
+            if (ver) |v| {
+                best_match = v;
+            } else {
+                const dir_to_check = try std.process.getCwdAlloc(alloc);
+                best_match = (try common.overrides.active_version(alloc, cp, dir_to_check)).ver;
+            }
+
+            const zig_path = try std.fs.path.join(alloc, &.{
+                common.paths.CommonPaths.get_zigvm_root(),
+                "installs/",
+                try common.release_name(alloc, try common.Rel.releasefromVersion(best_match)),
+                "zig",
+            });
+
+            var executable = std.ArrayList([]const u8).init(alloc);
+            try executable.append(zig_path);
+            try executable.append("std");
+            var child = std.process.Child.init(executable.items, alloc);
+            const term = try child.spawnAndWait();
+            std.process.exit(term.Exited);
+        },
+        Cli.reference => |ver| {
+            var best_match: []const u8 = undefined;
+            if (ver) |v| {
+                best_match = v;
+            } else {
+                const dir_to_check = try std.process.getCwdAlloc(alloc);
+                best_match = (try common.overrides.active_version(alloc, cp, dir_to_check)).ver;
+            }
+
+            const langref_path = try std.fs.path.join(alloc, &.{
+                common.paths.CommonPaths.get_zigvm_root(),
+                "installs/",
+                try common.release_name(alloc, try common.Rel.releasefromVersion(best_match)),
+                "doc",
+                "langref.html",
+            });
+
+            const main_exe = switch (builtin.os.tag) {
+                .windows => "explorer",
+                .macos => "open",
+                else => "xdg-open",
+            };
+
+            var executable = std.ArrayList([]const u8).init(alloc);
+            try executable.append(main_exe);
+            try executable.append(langref_path);
+            var child = std.process.Child.init(executable.items, alloc);
+            try child.spawn();
         },
         Cli.override => |oa| {
             var override_args = oa;
