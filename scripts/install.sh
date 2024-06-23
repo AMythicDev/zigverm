@@ -18,6 +18,12 @@ mkdir -p "$ZIGVM_ROOT_DIR"/{downloads,installs,bin}
 OS=$(uname -s | awk '{print tolower($0)}')
 ARCH=$(uname -m | awk '{print tolower($0)}')
 
+if [ "${ARCH}" = "x86_64" ] && [ "$(sysctl -in sysctl.proc_translated)" = "1" ]; then
+  ARCH="arm64"
+else
+  ARCH="x86_64"
+fi
+
 curl -L https://github.com/AMythicDev/zigvm/releases/download/v${VERSION}/zigvm-${VERSION}-"${ARCH}-${OS}".zip > /tmp/zigvm.zip
 unzip /tmp/zigvm.zip -d /tmp/
 
