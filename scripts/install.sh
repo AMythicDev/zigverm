@@ -24,6 +24,10 @@ else
   ARCH="x86_64"
 fi
 
+if  [ "${ARCH}" = "arm64" ]; then
+    ARCH="aarch64"
+fi
+
 curl -L https://github.com/AMythicDev/zigvm/releases/download/v${VERSION}/zigvm-${VERSION}-"${ARCH}-${OS}".zip > /tmp/zigvm.zip
 unzip /tmp/zigvm.zip -d /tmp/
 
