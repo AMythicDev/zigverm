@@ -75,6 +75,10 @@ fn addTestRunner(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.
         .target = target,
         .optimize = optimize,
     });
+    const default_os = target.result.os.tag;
+    if (default_os.isBSD() or default_os.isDarwin() or default_os == std.Target.Os.Tag.linux) {
+        common_tests.linkLibC();
+    }
     const run_common_tests = b.addRunArtifact(common_tests);
 
     const test_step = b.step("test", "Run unit tests");
