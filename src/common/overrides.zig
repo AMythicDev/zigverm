@@ -5,7 +5,7 @@ const json = std.json;
 const CommonPaths = @import("paths.zig").CommonPaths;
 
 pub const OverrideMap = struct {
-    backing_map: StringArrayHashMap([]const u8),
+    backing_map: json.ObjectMap,
     allocator: Allocator,
 
     const Self = @This();
@@ -14,7 +14,7 @@ pub const OverrideMap = struct {
         var iter = self.backing_map.iterator();
         while (iter.next()) |entry| {
             self.allocator.free(entry.key_ptr.*);
-            self.allocator.free(entry.value_ptr.*);
+            self.allocator.free(entry.value_ptr.string);
         }
         self.backing_map.deinit();
     }
@@ -25,7 +25,7 @@ pub const OverrideMap = struct {
 
         while (true) {
             if (self.backing_map.get(from)) |val| {
-                best_match = val;
+                best_match = val.string;
                 break;
             } else {
                 const next_dir_to_check = std.fs.path.dirname(from);
@@ -38,7 +38,7 @@ pub const OverrideMap = struct {
         }
 
         if (best_match == null) {
-            best_match = self.backing_map.get("default").?;
+            best_match = self.backing_map.get("default").?.string;
             from = "default";
         }
 
@@ -51,7 +51,7 @@ pub fn read_overrides(alloc: Allocator, cp: CommonPaths) !OverrideMap {
     var file_reader = file_bufreader.reader();
     var buff: [100]u8 = undefined;
 
-    var overrides = OverrideMap{ .backing_map = StringArrayHashMap([]const u8).init(alloc), .allocator = alloc };
+    var overrides = OverrideMap{ .backing_map = json.ObjectMap.init(alloc), .allocator = alloc };
 
     // HACK: Here we are ensuring that the overrides.json file isn't empty, otherwise the json parsing will return an
     // error. Instead if the file is empty, we create ab enott StringArrayHashMap to hold our overrides.
@@ -68,7 +68,8 @@ pub fn read_overrides(alloc: Allocator, cp: CommonPaths) !OverrideMap {
 
         var iter = parsed.value.object.iterator();
         while (iter.next()) |entry| {
-            _ = try overrides.backing_map.fetchPut(try alloc.dupe(u8, entry.key_ptr.*), try alloc.dupe(u8, entry.value_ptr.*.string));
+            const string = try alloc.dupe(u8, entry.value_ptr.*.string);
+            _ = try overrides.backing_map.fetchPut(try alloc.dupe(u8, entry.key_ptr.*), json.Value{ .string = string });
         }
     }
 
@@ -84,6 +85,7 @@ pub fn write_overrides(overrides: OverrideMap, cp: CommonPaths) !void {
     try cp.overrides.seekTo(0);
     try cp.overrides.setEndPos(0);
     var file_writer = std.io.bufferedWriter(cp.overrides.writer());
+
     try json.stringify(json.Value{ .object = overrides.backing_map }, .{ .whitespace = .indent_4 }, file_writer.writer());
     _ = try file_writer.write("\n");
     try file_writer.flush();
