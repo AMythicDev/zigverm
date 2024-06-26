@@ -79,6 +79,7 @@ zig build --release=safe
 - [x] Remove versions
 - [x] List down installed versions
 - [x] Manage default and per-directory version overrides
+- [x] Open the language reference and standard library docs (even when offline).
 - [x] Tries to maintain strong compatiblity with the wider zig ecosystem (`zls`, `zig.vim`)
 
 ## License
