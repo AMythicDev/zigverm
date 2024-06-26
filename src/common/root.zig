@@ -121,7 +121,6 @@ pub fn release_name(alloc: Allocator, rel: Rel) ![]const u8 {
     return try std.mem.concat(alloc, u8, &[_][]const u8{ "zig-" ++ dw_target ++ "-", release_string });
 }
 
-usingnamespace if (builtin.is_test)
-    @import("tests.zig")
-else
-    struct {};
+test {
+    std.testing.refAllDecls(@This());
+}

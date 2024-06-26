@@ -19,6 +19,7 @@ pub const CommonPaths = struct {
 
     pub fn resolve(alloc: Allocator) !@This() {
         zigvm_root_path = try zigvm_dir(alloc);
+        defer alloc.free(zigvm_root_path);
         const zigvm_root = try std.fs.openDirAbsolute(zigvm_root_path, .{});
         return CommonPaths{
             .zigvm_root = zigvm_root,
@@ -32,10 +33,9 @@ pub const CommonPaths = struct {
         if (std.process.getEnvVarOwned(alloc, "ZIGVM_ROOT_DIR")) |val| {
             return val;
         } else |_| {
-            var buff = std.ArrayList(u8).init(alloc);
-            try buff.appendSlice(try home_dir(alloc));
-            try buff.appendSlice("/.zigvm");
-            return buff.items;
+            const home = try home_dir(alloc);
+            defer alloc.free(home);
+            return try std.fs.path.join(alloc, &.{ home, ".zigvm" });
         }
     }
 
@@ -43,7 +43,7 @@ pub const CommonPaths = struct {
         return zigvm_root_path;
     }
 
-    pub fn clone(self: *Self) void {
+    pub fn close(self: *Self) void {
         self.overrides.close();
         self.download_dir.close();
         self.install_dir.close();
@@ -58,10 +58,12 @@ pub fn home_dir(alloc: Allocator) ![]const u8 {
         if (std.process.getEnvVarOwned(alloc, "USERPROFILE")) |val| {
             return val;
         } else |_| {
-            var buff = std.ArrayList(u8).init(alloc);
-            try buff.appendSlice(try std.process.getEnvVarOwned(alloc, "HOMEDRIVE"));
-            try buff.appendSlice(try std.process.getEnvVarOwned(alloc, "HOMEPATH"));
-            return buff.items;
+            const homedrive = try std.process.getEnvVarOwned(alloc, "HOMEDRIVE");
+            const homepath = try std.process.getEnvVarOwned(alloc, "HOMEPATH");
+            defer alloc.free(homedrive);
+            defer alloc.free(homepath);
+
+            return try std.fs.path.join(alloc, &.{ homedrive, homepath });
         }
     }
 
