@@ -17,7 +17,7 @@ pub fn main() !void {
     const best_match = (try overrides.active_version(dir_to_check)).ver;
 
     const zig_path = try std.fs.path.join(alloc, &.{
-        common.paths.CommonPaths.get_zigvm_root(),
+        common.paths.CommonPaths.get_zigverm_root(),
         "installs/",
         try common.release_name(alloc, try common.Rel.releasefromVersion(best_match)),
         "zig",

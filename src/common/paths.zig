@@ -8,46 +8,46 @@ const default_os = @import("root.zig").default_os;
 const default_arch = @import("root.zig").default_arch;
 
 pub const CommonPaths = struct {
-    zigvm_root: Dir,
+    zigverm_root: Dir,
     install_dir: Dir,
     download_dir: Dir,
     overrides: File,
 
     const Self = @This();
 
-    var zigvm_root_path: []const u8 = undefined;
+    var zigverm_root_path: []const u8 = undefined;
 
     pub fn resolve(alloc: Allocator) !@This() {
-        zigvm_root_path = try zigvm_dir(alloc);
-        defer alloc.free(zigvm_root_path);
-        const zigvm_root = try std.fs.openDirAbsolute(zigvm_root_path, .{});
+        zigverm_root_path = try zigverm_dir(alloc);
+        defer alloc.free(zigverm_root_path);
+        const zigverm_root = try std.fs.openDirAbsolute(zigverm_root_path, .{});
         return CommonPaths{
-            .zigvm_root = zigvm_root,
-            .install_dir = try zigvm_root.openDir("installs/", .{ .iterate = true }),
-            .download_dir = try zigvm_root.openDir("downloads/", .{ .iterate = true }),
-            .overrides = try zigvm_root.createFile("overrides.json", .{ .truncate = false, .read = true }),
+            .zigverm_root = zigverm_root,
+            .install_dir = try zigverm_root.openDir("installs/", .{ .iterate = true }),
+            .download_dir = try zigverm_root.openDir("downloads/", .{ .iterate = true }),
+            .overrides = try zigverm_root.createFile("overrides.json", .{ .truncate = false, .read = true }),
         };
     }
 
-    fn zigvm_dir(alloc: Allocator) ![]const u8 {
+    fn zigverm_dir(alloc: Allocator) ![]const u8 {
         if (std.process.getEnvVarOwned(alloc, "ZIGVM_ROOT_DIR")) |val| {
             return val;
         } else |_| {
             const home = try home_dir(alloc);
             defer alloc.free(home);
-            return try std.fs.path.join(alloc, &.{ home, ".zigvm" });
+            return try std.fs.path.join(alloc, &.{ home, ".zigverm" });
         }
     }
 
-    pub fn get_zigvm_root() []const u8 {
-        return zigvm_root_path;
+    pub fn get_zigverm_root() []const u8 {
+        return zigverm_root_path;
     }
 
     pub fn close(self: *Self) void {
         self.overrides.close();
         self.download_dir.close();
         self.install_dir.close();
-        self.zigvm_root.close();
+        self.zigverm_root.close();
     }
 };
 

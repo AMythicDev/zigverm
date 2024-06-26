@@ -24,7 +24,7 @@ def make_release_tarballs():
         for target in targets:
             print(f"Building for {target}")
             target_str = f"{target[0]}-{target[1]}"
-            target_dir = "zigvm-" + VERSION + "-" + target_str
+            target_dir = "zigverm-" + VERSION + "-" + target_str
             subprocess.run(["zig", "build", "install", "--prefix", "releases/",
                            "--prefix-exe-dir", target_dir, "--release=safe",
                             f"-Dtarget={target_str}"], check=True)
@@ -36,8 +36,8 @@ def make_release_tarballs():
                 else:
                     exe_ext = ""
 
-                z.write("releases/"+target_dir+"/zigvm" +
-                        exe_ext, target_dir+"/zigvm")
+                z.write("releases/"+target_dir+"/zigverm" +
+                        exe_ext, target_dir+"/zigverm")
                 z.write("releases/"+target_dir+"/zig"+exe_ext, target_dir+"/zig")
     except subprocess.CalledProcessError as e:
         print("\n\n===========================================================")

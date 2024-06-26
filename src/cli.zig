@@ -4,9 +4,9 @@ const streql = @import("common").streql;
 const Version = @import("main.zig").Version;
 
 const helptext =
-    \\zigvm - A version manager for Zig
+    \\zigverm - A version manager for Zig
     \\
-    \\zigvm [options] [command]
+    \\zigverm [options] [command]
     \\
     \\Commands:
     \\      install <version>                   Install a specific version. Version can be any valid semantic version

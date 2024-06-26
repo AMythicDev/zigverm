@@ -59,7 +59,7 @@ pub fn main() !void {
             }
 
             const zig_path = try std.fs.path.join(alloc, &.{
-                common.paths.CommonPaths.get_zigvm_root(),
+                common.paths.CommonPaths.get_zigverm_root(),
                 "installs/",
                 try common.release_name(alloc, try common.Rel.releasefromVersion(best_match)),
                 "zig",
@@ -85,7 +85,7 @@ pub fn main() !void {
             }
 
             const langref_path = try std.fs.path.join(alloc, &.{
-                common.paths.CommonPaths.get_zigvm_root(),
+                common.paths.CommonPaths.get_zigverm_root(),
                 "installs/",
                 try common.release_name(alloc, try common.Rel.releasefromVersion(best_match)),
                 "doc",
@@ -163,7 +163,7 @@ fn remove_release(alloc: Allocator, rel: Rel, cp: CommonPaths) !void {
 }
 
 fn show_info(alloc: Allocator, cp: CommonPaths) !void {
-    std.debug.print("zigvm root:\t{s}\n\n", .{CommonPaths.get_zigvm_root()});
+    std.debug.print("zigverm root:\t{s}\n\n", .{CommonPaths.get_zigverm_root()});
     var iter = cp.install_dir.iterate();
 
     const dir_to_check = try std.process.getCwdAlloc(alloc);
