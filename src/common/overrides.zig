@@ -6,14 +6,15 @@ const CommonPaths = @import("paths.zig").CommonPaths;
 
 pub const OverrideMap = struct {
     backing_map: StringArrayHashMap([]const u8),
+    allocator: Allocator,
 
     const Self = @This();
 
-    fn deinit(self: *Self) void {
+    pub fn deinit(self: *Self) void {
         var iter = self.backing_map.iterator();
         while (iter.next()) |entry| {
-            std.testing.allocator.free(entry.key_ptr.*);
-            std.testing.allocator.free(entry.value_ptr.*);
+            self.allocator.free(entry.key_ptr.*);
+            self.allocator.free(entry.value_ptr.*);
         }
         self.backing_map.deinit();
     }
@@ -37,7 +38,7 @@ pub const OverrideMap = struct {
         }
 
         if (best_match == null) {
-            best_match = try self.backing_map.get("default").?;
+            best_match = self.backing_map.get("default").?;
             from = "default";
         }
 
@@ -50,7 +51,7 @@ pub fn read_overrides(alloc: Allocator, cp: CommonPaths) !OverrideMap {
     var file_reader = file_bufreader.reader();
     var buff: [100]u8 = undefined;
 
-    var overrides = OverrideMap{ .backing_map = StringArrayHashMap([]const u8).init(alloc) };
+    var overrides = OverrideMap{ .backing_map = StringArrayHashMap([]const u8).init(alloc), .allocator = alloc };
 
     // HACK: Here we are ensuring that the overrides.json file isn't empty, otherwise the json parsing will return an
     // error. Instead if the file is empty, we create ab enott StringArrayHashMap to hold our overrides.
@@ -74,7 +75,7 @@ pub fn read_overrides(alloc: Allocator, cp: CommonPaths) !OverrideMap {
     return overrides;
 }
 
-pub fn write_overrides(overrides: StringArrayHashMap(json.Value), cp: CommonPaths) !void {
+pub fn write_overrides(overrides: OverrideMap, cp: CommonPaths) !void {
     // NOTE: VERY IMPORTANT LINE FOR NOT SPAGHETTIFYING THE WHOLE FILE:
     // What we are effectively trying to do is truncate the file to zero length. For that we use the `setEndPos`
     // function. `setEndPos` resizes the file based on the current file cursor postion. It is sure that the file cursor
@@ -83,7 +84,7 @@ pub fn write_overrides(overrides: StringArrayHashMap(json.Value), cp: CommonPath
     try cp.overrides.seekTo(0);
     try cp.overrides.setEndPos(0);
     var file_writer = std.io.bufferedWriter(cp.overrides.writer());
-    try json.stringify(json.Value{ .object = overrides }, .{ .whitespace = .indent_4 }, file_writer.writer());
+    try json.stringify(json.Value{ .object = overrides.backing_map }, .{ .whitespace = .indent_4 }, file_writer.writer());
     _ = try file_writer.write("\n");
     try file_writer.flush();
 }
