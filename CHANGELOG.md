@@ -1,6 +1,13 @@
 # Changelog
 This file documents all changes made to the project and is updated before each release.
 
+## v0.3.0 [2024-06-26]
+### Changed
+- **BREAKING CHANGE** Renamed zigvm to zigverm
+
+### Fixed
+- Fix all memoery leaks prosent in the common module 
+
 ## v0.2.0 [2024-06-13]
 ### Added
 - Add support for continuing download if thers's a interrupt in between a download

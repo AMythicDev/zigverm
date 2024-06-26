@@ -5,7 +5,7 @@ import subprocess
 import os
 import zipfile
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 
 def make_release_tarballs():
     try:
