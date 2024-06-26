@@ -23,7 +23,7 @@ pub fn main() !void {
     const command = try Cli.read_args(alloc);
 
     var cp = try CommonPaths.resolve(alloc);
-    defer cp.clone();
+    defer cp.close();
 
     switch (command) {
         Cli.install => |version| {
@@ -52,7 +52,10 @@ pub fn main() !void {
                 best_match = v;
             } else {
                 const dir_to_check = try std.process.getCwdAlloc(alloc);
-                best_match = (try common.overrides.active_version(alloc, cp, dir_to_check)).ver;
+                var overrides = try common.overrides.read_overrides(alloc, cp);
+                defer overrides.deinit();
+
+                best_match = (try overrides.active_version(dir_to_check)).ver;
             }
 
             const zig_path = try std.fs.path.join(alloc, &.{
@@ -75,7 +78,10 @@ pub fn main() !void {
                 best_match = v;
             } else {
                 const dir_to_check = try std.process.getCwdAlloc(alloc);
-                best_match = (try common.overrides.active_version(alloc, cp, dir_to_check)).ver;
+                var overrides = try common.overrides.read_overrides(alloc, cp);
+                defer overrides.deinit();
+
+                best_match = (try overrides.active_version(dir_to_check)).ver;
             }
 
             const langref_path = try std.fs.path.join(alloc, &.{
@@ -161,7 +167,10 @@ fn show_info(alloc: Allocator, cp: CommonPaths) !void {
     var iter = cp.install_dir.iterate();
 
     const dir_to_check = try std.process.getCwdAlloc(alloc);
-    const active_version = try common.overrides.active_version(alloc, cp, dir_to_check);
+    var overrides = try common.overrides.read_overrides(alloc, cp);
+    defer overrides.deinit();
+
+    const active_version = (try overrides.active_version(dir_to_check));
 
     std.debug.print("Active version: {s} (from '{s}')\n\n", .{ active_version.ver, active_version.from });
     std.debug.print("Installed releases:\n\n", .{});
@@ -178,13 +187,15 @@ fn show_info(alloc: Allocator, cp: CommonPaths) !void {
 
 fn override(alloc: Allocator, cp: CommonPaths, rel: Rel, directory: []const u8) !void {
     var overrides = try common.overrides.read_overrides(alloc, cp);
-    try overrides.put(directory, json.Value{ .string = rel.releaseName() });
+    defer overrides.deinit();
+    try overrides.backing_map.put(directory, rel.releaseName());
     try common.overrides.write_overrides(overrides, cp);
 }
 
 fn override_rm(alloc: Allocator, cp: CommonPaths, directory: []const u8) !void {
     var overrides = try common.overrides.read_overrides(alloc, cp);
-    _ = overrides.orderedRemove(directory);
+    defer overrides.deinit();
+    _ = overrides.backing_map.orderedRemove(directory);
     try common.overrides.write_overrides(overrides, cp);
 }
 

@@ -7,11 +7,14 @@ pub fn main() !void {
     const alloc = aa.allocator();
 
     var cp = try common.paths.CommonPaths.resolve(alloc);
-    defer cp.clone();
+    defer cp.close();
 
     const dir_to_check = try std.process.getCwdAlloc(alloc);
 
-    const best_match = (try common.overrides.active_version(alloc, cp, dir_to_check)).ver;
+    var overrides = try common.overrides.read_overrides(alloc, cp);
+    defer overrides.deinit();
+
+    const best_match = (try overrides.active_version(dir_to_check)).ver;
 
     const zig_path = try std.fs.path.join(alloc, &.{
         common.paths.CommonPaths.get_zigvm_root(),
