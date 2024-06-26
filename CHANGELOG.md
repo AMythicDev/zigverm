@@ -2,15 +2,21 @@
 This file documents all changes made to the project and is updated before each release.
 
 ## v0.3.0 [2024-06-26]
+### Added
+- `langref` and `std` subcommands to open the language reference and standard library for the active version or
+  a specified version.
+
 ### Changed
-- **BREAKING CHANGE** Renamed zigvm to zigverm
+- **BREAKING CHANGE** Renamed zigvm to zigverm.
 
 ### Fixed
-- Fix all memoery leaks prosent in the common module 
+- Fix all memoery leaks prosent in the common module.
+- Wrong tarball downloaded when running install.sh under Rosetta2.
+- Fix tarball not downloading on `aarch64` macs due to `uname -m` reporting it as `arm64`
 
 ## v0.2.0 [2024-06-13]
 ### Added
-- Add support for continuing download if thers's a interrupt in between a download
+- Add support for continuing download if thers's a interrupt in between a download.
 - Add support for updating master, stable and x.y releases to latest point releases.
 
 ## Changed
