@@ -5,9 +5,13 @@ import subprocess
 import os
 import zipfile
 
-VERSION = "0.3.0"
 
 def make_release_tarballs():
+    VERSION = None
+    if VERSION is None:
+        process = subprocess.run(["zig", "build", "run-zigverm", "--", "--version" ], check=True, capture_output=True)
+        VERSION = process.stdout.decode('utf-8').strip()
+
     try:
         targets = [
             ["aarch64", "macos"],
@@ -25,6 +29,9 @@ def make_release_tarballs():
             print(f"Building for {target}")
             target_str = f"{target[0]}-{target[1]}"
             target_dir = "zigverm-" + VERSION + "-" + target_str
+            subprocess.run(["zig", "build", "install", "--prefix", "releases/",
+                           "--prefix-exe-dir", target_dir, "--release=safe",
+                            f"-Dtarget={target_str}"], check=True)
             subprocess.run(["zig", "build", "install", "--prefix", "releases/",
                            "--prefix-exe-dir", target_dir, "--release=safe",
                             f"-Dtarget={target_str}"], check=True)
