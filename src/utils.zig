@@ -33,7 +33,7 @@ pub fn check_install_name(name: []const u8) bool {
     return true;
 }
 
-pub fn is_valid_arch_os(arch: ?[]const u8, os: ?[]const u8) bool {
+pub inline fn is_valid_arch_os(arch: ?[]const u8, os: ?[]const u8) bool {
     const arch_fields = @typeInfo(std.Target.Cpu.Arch).Enum.fields;
     comptime var archs: [arch_fields.len][]const u8 = undefined;
     comptime {
