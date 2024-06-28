@@ -27,7 +27,7 @@ Legend:
 You can use this automated install script which will install zigverm along with the latest version of Zig
 
 ```sh
-curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/AMythicDev/zigverm/main/scripts/install.sh | sh
+curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/AMythicDev/zigverm/main/scripts/install.sh | bash
 ```
 
 By default it will create `$HOME/.zigverm` directory as the root folder for zigverm. You can customize
