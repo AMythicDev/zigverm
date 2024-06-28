@@ -143,8 +143,8 @@ pub fn main() !void {
                 }
                 try install.install_release(alloc, &client, releases, &rel, cp);
             }
+            if (uptodate.items.len > 0) std.debug.print("\n", .{});
 
-            std.debug.print("\n", .{});
             for (uptodate.items) |v| {
                 std.debug.print("\t{s}    :    Up to date\n", .{v});
             }
