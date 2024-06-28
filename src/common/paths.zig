@@ -15,11 +15,13 @@ pub const CommonPaths = struct {
 
     const Self = @This();
 
+    var allocator: Allocator = undefined;
+
     var zigverm_root_path: []const u8 = undefined;
 
     pub fn resolve(alloc: Allocator) !@This() {
+        allocator = alloc;
         zigverm_root_path = try zigverm_dir(alloc);
-        defer alloc.free(zigverm_root_path);
         const zigverm_root = try std.fs.openDirAbsolute(zigverm_root_path, .{});
         return CommonPaths{
             .zigverm_root = zigverm_root,
@@ -48,6 +50,7 @@ pub const CommonPaths = struct {
         self.download_dir.close();
         self.install_dir.close();
         self.zigverm_root.close();
+        allocator.free(zigverm_root_path);
     }
 };
 
