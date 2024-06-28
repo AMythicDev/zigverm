@@ -1,6 +1,13 @@
 # Changelog
 This file documents all changes made to the project and is updated before each release.
 
+## v0.3.1 [2024-06-28]
+### Fixed
+- Segfault when overriding
+- Architecture detection errors in install.sh on non-darwin based aarch64 systems 
+- Enviroment variable for root is not `ZIGVERM_ROOT_DIR`
+- Potential memory issues in `CommonPaths`
+
 ## v0.3.0 [2024-06-26]
 ### Added
 - `langref` and `std` subcommands to open the language reference and standard library for the active version or
