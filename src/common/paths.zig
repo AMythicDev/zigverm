@@ -30,7 +30,7 @@ pub const CommonPaths = struct {
     }
 
     fn zigverm_dir(alloc: Allocator) ![]const u8 {
-        if (std.process.getEnvVarOwned(alloc, "ZIGVM_ROOT_DIR")) |val| {
+        if (std.process.getEnvVarOwned(alloc, "ZIGVERM_ROOT_DIR")) |val| {
             return val;
         } else |_| {
             const home = try home_dir(alloc);

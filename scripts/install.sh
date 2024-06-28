@@ -4,16 +4,16 @@ set -e
 
 VERSION="0.3.0"
 
-if [[ -z $ZIGVM_ROOT_DIR ]]; then
-  ZIGVM_ROOT_DIR=$HOME/.zigverm
+if [[ -z $ZIGVERM_ROOT_DIR ]]; then
+  ZIGVERM_ROOT_DIR=$HOME/.zigverm
 fi
 
-if [[ -f $ZIGVM_ROOT_DIR/bin/zigverm ]]; then
-  echo "zigverm already available at $ZIGVM_ROOT_DIR. Exitting now" 1>&2;
+if [[ -f $ZIGVERM_ROOT_DIR/bin/zigverm ]]; then
+  echo "zigverm already available at $ZIGVERM_ROOT_DIR. Exitting now" 1>&2;
   exit 0;
 fi
 
-mkdir -p "$ZIGVM_ROOT_DIR"/{downloads,installs,bin}
+mkdir -p "$ZIGVERM_ROOT_DIR"/{downloads,installs,bin}
 
 OS=$(uname -s | awk '{print tolower($0)}')
 ARCH=$(uname -m | awk '{print tolower($0)}')
@@ -33,36 +33,36 @@ fi
 curl -L https://github.com/AMythicDev/zigverm/releases/download/v${VERSION}/zigverm-${VERSION}-"${ARCH}-${OS}".zip > /tmp/zigverm.zip
 unzip /tmp/zigverm.zip -d /tmp/
 
-mv /tmp/zigverm-${VERSION}-"${ARCH}-${OS}"/zigverm "$ZIGVM_ROOT_DIR/bin"
-mv /tmp/zigverm-${VERSION}-"${ARCH}-${OS}"/zig "$ZIGVM_ROOT_DIR/bin"
+mv /tmp/zigverm-${VERSION}-"${ARCH}-${OS}"/zigverm "$ZIGVERM_ROOT_DIR/bin"
+mv /tmp/zigverm-${VERSION}-"${ARCH}-${OS}"/zig "$ZIGVERM_ROOT_DIR/bin"
 
 echo "Installing zig stable"
-"$ZIGVM_ROOT_DIR"/bin/zigverm install stable
+"$ZIGVERM_ROOT_DIR"/bin/zigverm install stable
 echo "Setting default version to stable"
-"$ZIGVM_ROOT_DIR"/bin/zigverm override default stable
+"$ZIGVERM_ROOT_DIR"/bin/zigverm override default stable
 
 DEFAULT_SHELL=$(getent passwd "$USER" | awk -F: '{ print($NF) } ' | awk -F/ '{ print ($NF) }')
 
 case $DEFAULT_SHELL in
   "bash")
     # shellcheck disable=SC2016
-    echo 'export PATH=$PATH:'"$ZIGVM_ROOT_DIR/bin" >> "$HOME/.bashrc"
+    echo 'export PATH=$PATH:'"$ZIGVERM_ROOT_DIR/bin" >> "$HOME/.bashrc"
     ;;
   "zsh")
     # shellcheck disable=SC2016
-    echo 'export PATH=$PATH:'"$ZIGVM_ROOT_DIR/bin" >> "$HOME/.zshrc"
+    echo 'export PATH=$PATH:'"$ZIGVERM_ROOT_DIR/bin" >> "$HOME/.zshrc"
     ;;
   "fish")
     # shellcheck disable=SC2016
-    echo 'set -x PATH=$PATH:'"$ZIGVM_ROOT_DIR/bin" >> "${XDG_CONFIG_HOME:-$HOME/.config}/fish/config.fish"
+    echo 'set -x PATH=$PATH:'"$ZIGVERM_ROOT_DIR/bin" >> "${XDG_CONFIG_HOME:-$HOME/.config}/fish/config.fish"
     ;;
   *)
     echo "Cannot write to shell rc file. Unknown shell" 1>&2;
-    echo "You need to manually add {$ZIGVM_ROOT_DIR}/bin to ensure zigverm can be called from anywhere."
+    echo "You need to manually add {$ZIGVERM_ROOT_DIR}/bin to ensure zigverm can be called from anywhere."
     ;;
 esac
 
 # shellcheck disable=SC2016
-echo 'export PATH=$PATH:'"$ZIGVM_ROOT_DIR"/bin/ >> "$HOME"/.profile
+echo 'export PATH=$PATH:'"$ZIGVERM_ROOT_DIR"/bin/ >> "$HOME"/.profile
 
 echo -e "\033[0;33;1mzigverm installed successfully\nPlease restart your terminal for changes to take effect.\033[0m"

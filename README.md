@@ -1,4 +1,4 @@
-**zigvm has been renamed to zigverm for a better name. If you notice the zigvm name used anywhere in project source code, feel free to inform me.**
+**ZIGVERM has been renamed to zigverm for a better name. If you notice the ZIGVERM name used anywhere in project source code, feel free to inform me.**
 
 # zigverm
 Version manager for the Zig Programming Language.
@@ -31,8 +31,8 @@ curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/AMythicDe
 ```
 
 By default it will create `$HOME/.zigverm` directory as the root folder for zigverm. You can customize
-this by setting this by setting the `ZIGVM_ROOT_DIR` to the directory where you want to install
-zigverm. Make sire you add the `ZIGVM_ROOT_DIR` in your shell config otherwise zigverm would not be able
+this by setting this by setting the `ZIGVERM_ROOT_DIR` to the directory where you want to install
+zigverm. Make sire you add the `ZIGVERM_ROOT_DIR` in your shell config otherwise zigverm would not be able
 to locate the installation folder.
 
 The script will also put the installation directory's `bin` folder to your `$PATH` variable. For
