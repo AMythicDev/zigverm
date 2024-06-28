@@ -14,9 +14,13 @@ pub const OverrideMap = struct {
         var iter = self.backing_map.iterator();
         while (iter.next()) |entry| {
             self.allocator.free(entry.key_ptr.*);
-            self.allocator.free(entry.value_ptr.string);
+            self.allocator.free(entry.value_ptr.*.string);
         }
         self.backing_map.deinit();
+    }
+
+    pub fn addOverride(self: *Self, dir: []const u8, release_name: []const u8) !void {
+        try self.backing_map.put(dir, json.Value{ .string = try self.allocator.dupe(u8, release_name) });
     }
 
     pub fn active_version(self: Self, dir_to_check: []const u8) !struct { from: []const u8, ver: []const u8 } {
