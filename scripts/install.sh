@@ -21,8 +21,6 @@ ARCH=$(uname -m | awk '{print tolower($0)}')
 if [ "${OS}" = "darwin" ]; then
   if [ "${ARCH}" = "x86_64" ] && [ "$(sysctl -in sysctl.proc_translated)" = "1" ]; then
     ARCH="arm64"
-  else
-    ARCH="x86_64"
   fi
 fi
 
