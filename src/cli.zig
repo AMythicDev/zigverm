@@ -2,6 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const streql = @import("common").streql;
 const Version = @import("main.zig").Version;
+const utils = @import("utils.zig");
 
 const helptext =
     \\zigverm - A version manager for Zig
@@ -87,10 +88,10 @@ pub const Cli = union(enum) {
         } else if (streql(cmd, "info")) {
             command = Cli.show;
         } else if (streql(cmd, "-h") or streql(cmd, "--help")) {
-            std.debug.print("{s}\n", .{helptext});
+            utils.printStdOut("{s}\n", .{helptext});
             std.process.exit(0);
         } else if (streql(cmd, "-V") or streql(cmd, "--version")) {
-            std.debug.print("{s}\n", .{Version});
+            utils.printStdOut("{s}\n", .{Version});
             std.process.exit(0);
         } else if (streql(cmd, "override")) {
             const rel_or_directory = arg_iter.next() orelse return incorrectUsage(null);
