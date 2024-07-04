@@ -1,4 +1,4 @@
-**ZIGVERM has been renamed to zigverm for a better name. If you notice the ZIGVERM name used anywhere in project source code, feel free to inform me.**
+**zigvm has been renamed to zigverm for a better name. If you notice the zigvm name used anywhere in project source code, feel free to inform me.**
 
 # zigverm
 Version manager for the Zig Programming Language.
