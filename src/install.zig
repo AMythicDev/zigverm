@@ -33,19 +33,33 @@ pub fn install_release(alloc: Allocator, client: *Client, releases: json.Value, 
     const release: json.Value = releases.object.get(try rel.actualVersion(alloc)).?;
     const target = release.object.get(target_name()) orelse return InstallError.TargetNotAvailable;
     const tarball_url = target.object.get("tarball").?.string;
+    const shasum = target.object.get("shasum").?.string[0..64];
     const total_size = try std.fmt.parseInt(usize, target.object.get("size").?.string, 10);
 
     const tarball_dw_filename = try dw_tarball_name(alloc, rel.*);
 
+    var tarball = try get_correct_tarball(alloc, client, tarball_dw_filename, tarball_url, total_size, shasum, cp, false, 0);
+    defer tarball.close();
+
+    var tarball_reader = std.io.bufferedReader(tarball.reader());
+
+    std.log.info("Extracting {s}", .{tarball_dw_filename});
+    try cp.install_dir.deleteTree(try release_name(alloc, rel.*));
+    try extract_xz(alloc, cp, rel.*, tarball_reader.reader());
+
+    try cp.download_dir.deleteFile(tarball_dw_filename);
+}
+
+fn get_correct_tarball(alloc: Allocator, client: *Client, tarball_dw_filename: []const u8, tarball_url: []const u8, total_size: usize, shasum: *const [64]u8, cp: CommonPaths, tries: u8) !std.fs.File {
+    const force_redownload = tries > 0;
     // IMPORTANT: To continue downloading if the file isn't completely downloaded AKA partial downloading, we
     // open the file with .truncate = false and then later move the file cursor to the end of the file using seekFromEnd().
     // This is basically Zig's equivalent to *open in append mode*.
-    var tarball = try cp.download_dir.createFile(tarball_dw_filename, .{ .read = true, .truncate = false });
-    defer tarball.close();
-    const tarball_size = (try tarball.metadata()).size();
+    var tarball = try cp.download_dir.createFile(tarball_dw_filename, .{ .read = true, .truncate = force_redownload });
+    const tarball_size = if (force_redownload) 0 else (try tarball.metadata()).size();
 
-    if (tarball_size < total_size) {
-        try tarball.seekFromEnd(0);
+    if (tarball_size < total_size or force_redownload) {
+        try tarball.seekTo(tarball_size);
         var tarball_writer = std.io.bufferedWriter(tarball.writer());
         try download_tarball(
             alloc,
@@ -61,19 +75,19 @@ pub fn install_release(alloc: Allocator, client: *Client, releases: json.Value, 
     }
 
     var tarball_reader = std.io.bufferedReader(tarball.reader());
-    const hash_matched = try check_hash(target.object.get("shasum").?.string[0..64], tarball_reader.reader());
+    const hash_matched = try check_hash(shasum, tarball_reader.reader());
 
     if (!hash_matched) {
-        std.log.err("Hashes do match for downloaded tarball. Exitting", .{});
-        return error.BadChecksum;
+        if (tries < 3) {
+            std.log.warn("Hashes do match for downloaded tarball. Retrying again...", .{});
+            tarball = try get_correct_tarball(alloc, client, tarball_dw_filename, tarball_url, total_size, shasum, cp, true, tries + 1);
+        } else {
+            std.log.err("Hashes do match for downloaded tarball. Exitting", .{});
+            return error.BadChecksum;
+        }
     }
     try tarball.seekTo(0);
-
-    std.log.info("Extracting {s}", .{tarball_dw_filename});
-    try cp.install_dir.deleteTree(try release_name(alloc, rel.*));
-    try extract_xz(alloc, cp, rel.*, tarball_reader.reader());
-
-    try cp.download_dir.deleteFile(tarball_dw_filename);
+    return tarball;
 }
 
 fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, tb_writer: anytype, tarball_size: u64, total_size: usize) !void {
