@@ -38,7 +38,7 @@ pub fn install_release(alloc: Allocator, client: *Client, releases: json.Value, 
 
     const tarball_dw_filename = try dw_tarball_name(alloc, rel.*);
 
-    var tarball = try get_correct_tarball(alloc, client, tarball_dw_filename, tarball_url, total_size, shasum, cp, false, 0);
+    var tarball = try get_correct_tarball(alloc, client, tarball_dw_filename, tarball_url, total_size, shasum, cp, 0);
     defer tarball.close();
 
     var tarball_reader = std.io.bufferedReader(tarball.reader());
@@ -80,7 +80,7 @@ fn get_correct_tarball(alloc: Allocator, client: *Client, tarball_dw_filename: [
     if (!hash_matched) {
         if (tries < 3) {
             std.log.warn("Hashes do match for downloaded tarball. Retrying again...", .{});
-            tarball = try get_correct_tarball(alloc, client, tarball_dw_filename, tarball_url, total_size, shasum, cp, true, tries + 1);
+            tarball = try get_correct_tarball(alloc, client, tarball_dw_filename, tarball_url, total_size, shasum, cp, tries + 1);
         } else {
             std.log.err("Hashes do match for downloaded tarball. Exitting", .{});
             return error.BadChecksum;
