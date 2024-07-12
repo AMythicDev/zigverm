@@ -3,7 +3,7 @@ const builtin = @import("builtin");
 const common = @import("common");
 const CommonPaths = common.paths.CommonPaths;
 const streql = common.streql;
-const Rel = common.Rel;
+const Release = common.Release;
 const release_name = common.release_name;
 
 const Allocator = std.mem.Allocator;
@@ -25,7 +25,7 @@ pub fn check_install_name(name: []const u8) bool {
         return false;
     }
     const version = components.next() orelse return false;
-    const sv = if (common.Rel.completeSpec(version)) |_| true else |_| false;
+    const sv = if (common.Release.completeSpec(version)) |_| true else |_| false;
     if (!streql(version, "stable") and !streql(version, "master") and !sv) {
         return false;
     }
@@ -70,7 +70,7 @@ pub inline fn is_valid_arch_os(arch: ?[]const u8, os: ?[]const u8) bool {
     return result;
 }
 
-pub fn check_not_installed(alloc: Allocator, rel: Rel, dirs: CommonPaths) !bool {
+pub fn check_not_installed(alloc: Allocator, rel: Release, dirs: CommonPaths) !bool {
     return dirs.install_dir.access(try release_name(alloc, rel), .{}) == std.fs.Dir.AccessError.FileNotFound;
 }
 

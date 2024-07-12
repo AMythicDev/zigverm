@@ -1,7 +1,7 @@
 const std = @import("std");
 const json = std.json;
 const Allocator = std.mem.Allocator;
-const Rel = @import("./root.zig").Rel;
+const Release = @import("./root.zig").Release;
 
 fn make_mock_releases(alloc: Allocator) !std.StringArrayHashMap(json.Value) {
     var releases_map = json.ObjectMap.init(alloc);
@@ -30,7 +30,7 @@ test "Resolve exact version" {
     defer releases_map.deinit();
     const releases = json.Value{ .object = releases_map };
 
-    var rel = try Rel.releasefromVersion("0.12.0");
+    var rel = try Release.releaseFromVersion("0.12.0");
     try rel.resolve(releases);
 
     const v = try rel.actualVersion(alloc);
@@ -45,7 +45,7 @@ test "Resolve patch version with no patch releases" {
     defer releases_map.deinit();
     const releases = json.Value{ .object = releases_map };
 
-    var rel = try Rel.releasefromVersion("0.12");
+    var rel = try Release.releasefromVersion("0.12");
     try rel.resolve(releases);
 
     const v = try rel.actualVersion(alloc);
@@ -60,7 +60,7 @@ test "Resolve patch version with patch releases" {
     defer releases_map.deinit();
     const releases = json.Value{ .object = releases_map };
 
-    var rel = try Rel.releasefromVersion("0.10");
+    var rel = try Release.releasefromVersion("0.10");
     try rel.resolve(releases);
 
     const v = try rel.actualVersion(alloc);
@@ -75,7 +75,7 @@ test "Resolve stable" {
     defer releases_map.deinit();
     const releases = json.Value{ .object = releases_map };
 
-    var rel = try Rel.releasefromVersion("stable");
+    var rel = try Release.releasefromVersion("stable");
     try rel.resolve(releases);
 
     const v = try rel.actualVersion(alloc);

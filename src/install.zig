@@ -6,7 +6,7 @@ const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 const Client = std.http.Client;
 const json = std.json;
-const Rel = common.Rel;
+const Release = common.Release;
 const paths = common.paths;
 const CommonPaths = paths.CommonPaths;
 const http = std.http;
@@ -27,7 +27,7 @@ const InstallError = error{
     TargetNotAvailable,
 };
 
-pub fn install_release(alloc: Allocator, client: *Client, releases: json.Value, rel: *Rel, cp: CommonPaths) !void {
+pub fn install_release(alloc: Allocator, client: *Client, releases: json.Value, rel: *Release, cp: CommonPaths) !void {
     try rel.resolve(releases);
 
     const release: json.Value = releases.object.get(try rel.actualVersion(alloc)).?;
@@ -201,7 +201,7 @@ pub fn check_hash(hashstr: *const [64]u8, reader: anytype) !bool {
     return std.mem.eql(u8, &hasher.finalResult(), &hash);
 }
 
-inline fn extract_xz(alloc: Allocator, dirs: CommonPaths, rel: Rel, reader: anytype) !void {
+inline fn extract_xz(alloc: Allocator, dirs: CommonPaths, rel: Release, reader: anytype) !void {
     var xz = try std.compress.xz.decompress(alloc, reader);
     const release_dir = try dirs.install_dir.makeOpenPath(try release_name(alloc, rel), .{});
     try std.tar.pipeToFileSystem(release_dir, xz.reader(), .{ .strip_components = 1 });
@@ -211,7 +211,7 @@ pub fn target_name() []const u8 {
     return @tagName(default_arch) ++ "-" ++ @tagName(default_os);
 }
 
-pub fn dw_tarball_name(alloc: Allocator, rel: Rel) ![]const u8 {
+pub fn dw_tarball_name(alloc: Allocator, rel: Release) ![]const u8 {
     const release_string = rel.releaseName();
     const dw_target = comptime target_name();
     return try std.mem.concat(alloc, u8, &[_][]const u8{ "zig-" ++ dw_target ++ "-", release_string, ".tar.xz.partial" });

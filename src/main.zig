@@ -11,7 +11,7 @@ const File = std.fs.File;
 const Allocator = std.mem.Allocator;
 const streql = common.streql;
 const CommonPaths = paths.CommonPaths;
-const Rel = common.Rel;
+const Release = common.Release;
 const install = @import("install.zig");
 
 pub const Version = "0.3.1";
@@ -27,7 +27,7 @@ pub fn main() !void {
 
     switch (command) {
         Cli.install => |version| {
-            var rel = try Rel.releasefromVersion(version);
+            var rel = try Release.releasefromVersion(version);
             if (!(try utils.check_not_installed(alloc, rel, cp))) {
                 std.log.err("Version already installled. Quitting", .{});
                 std.process.exit(0);
@@ -42,7 +42,7 @@ pub fn main() !void {
             try install.install_release(alloc, &client, releases, &rel, cp);
         },
         Cli.remove => |version| {
-            const rel = try Rel.releasefromVersion(version);
+            const rel = try Release.releasefromVersion(version);
             try remove_release(alloc, rel, cp);
         },
         Cli.show => try show_info(alloc, cp),
@@ -61,7 +61,7 @@ pub fn main() !void {
             const zig_path = try std.fs.path.join(alloc, &.{
                 common.paths.CommonPaths.get_zigverm_root(),
                 "installs/",
-                try common.release_name(alloc, try common.Rel.releasefromVersion(best_match)),
+                try common.release_name(alloc, try common.Release.releasefromVersion(best_match)),
                 "zig",
             });
 
@@ -87,7 +87,7 @@ pub fn main() !void {
             const langref_path = try std.fs.path.join(alloc, &.{
                 common.paths.CommonPaths.get_zigverm_root(),
                 "installs/",
-                try common.release_name(alloc, try common.Rel.releasefromVersion(best_match)),
+                try common.release_name(alloc, try common.Release.releasefromVersion(best_match)),
                 "doc",
                 "langref.html",
             });
@@ -106,7 +106,7 @@ pub fn main() !void {
         },
         Cli.override => |oa| {
             var override_args = oa;
-            const rel = try Rel.releasefromVersion(override_args.version);
+            const rel = try Release.releasefromVersion(override_args.version);
             if (override_args.directory != null and !streql(override_args.directory.?, "default")) {
                 override_args.directory = try std.fs.realpathAlloc(alloc, override_args.directory.?);
             }
@@ -132,12 +132,12 @@ pub fn main() !void {
             const releases = try json.parseFromSliceLeaky(json.Value, alloc, resp.body[0..resp.length], .{});
 
             for (versions) |v| {
-                var rel = try Rel.releasefromVersion(v);
+                var rel = try Release.releasefromVersion(v);
                 if (check_installed and try utils.check_not_installed(alloc, rel, cp)) {
                     try install.install_release(alloc, &client, releases, &rel, cp);
                     return;
                 }
-                if (rel.release == common.ReleaseSpec.FullVersionSpec) {
+                if (rel.spec == common.ReleaseSpec.FullVersionSpec) {
                     try uptodate.append(v);
                     continue;
                 }
@@ -152,7 +152,7 @@ pub fn main() !void {
     }
 }
 
-fn remove_release(alloc: Allocator, rel: Rel, cp: CommonPaths) !void {
+fn remove_release(alloc: Allocator, rel: Release, cp: CommonPaths) !void {
     if ((try utils.check_not_installed(alloc, rel, cp))) {
         std.log.err("Version not installled. Quitting", .{});
         std.process.exit(0);
@@ -185,7 +185,7 @@ fn show_info(alloc: Allocator, cp: CommonPaths) !void {
     }
 }
 
-fn override(alloc: Allocator, cp: CommonPaths, rel: Rel, directory: []const u8) !void {
+fn override(alloc: Allocator, cp: CommonPaths, rel: Release, directory: []const u8) !void {
     var overrides = try common.overrides.read_overrides(alloc, cp);
     defer overrides.deinit();
     try overrides.addOverride(directory, rel.releaseName());
