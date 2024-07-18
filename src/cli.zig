@@ -17,9 +17,8 @@ const helptext =
     \\                                              - "default", to change the default version
     \\                                              - ommited to use the current directory
     \\      override-rm [DIRECTORY]             Override the version of zig used under DIRECTORY. DIRECTORY can be
-    \\                                              - Path to a directory, under which to override
-    \\                                              - "default", to change the default version
-    \\                                              - An empty string to use the current directory
+    \\                                              - Path to a directory, under which to remove override
+    \\                                              - An empty string to remove for the current directory
     \\      update [VERSION]                    Update version to its latest available point release, If [VERSION] is
     \\                                          not provided, it will update all installed versions
     \\      std [VERSION]                       Open the standard library documentation in the default web browser.

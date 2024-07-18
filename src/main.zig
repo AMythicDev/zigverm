@@ -193,6 +193,10 @@ fn override(alloc: Allocator, cp: CommonPaths, rel: Release, directory: []const 
 }
 
 fn override_rm(alloc: Allocator, cp: CommonPaths, directory: []const u8) !void {
+    if (streql(directory, "default")) {
+        std.log.err("cannot remove the default override", .{});
+        std.process.exit(1);
+    }
     var overrides = try common.overrides.read_overrides(alloc, cp);
     defer overrides.deinit();
     _ = overrides.backing_map.orderedRemove(directory);
