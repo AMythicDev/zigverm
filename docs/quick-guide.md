@@ -78,7 +78,7 @@ zigverm info
 
 ### Open the language reference for the active Zig version
 ````sh
-zigverm langref
+zigverm reference
 ````
 
 ### Open the standard library documentation for the active Zig version
