@@ -82,5 +82,8 @@ zig build --release=safe
 - [x] Open the language reference and standard library docs (even when offline).
 - [x] Tries to maintain strong compatiblity with the wider zig ecosystem (`zls`, `zig.vim`)
 
+## Docs
+Read the [quick guide](./docs/quick-guide.md)
+
 ## License
 `zigverm` is licensed under the Apache License 2.0. See the [LICENSE](./LICENSE) file.
