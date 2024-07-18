@@ -55,7 +55,7 @@ pub fn main() !void {
                 var overrides = try common.overrides.read_overrides(alloc, cp);
                 defer overrides.deinit();
 
-                best_match = (try overrides.active_version(dir_to_check)).ver;
+                best_match = try alloc.dupe(u8, (try overrides.active_version(dir_to_check)).ver);
             }
 
             const zig_path = try std.fs.path.join(alloc, &.{
@@ -81,7 +81,7 @@ pub fn main() !void {
                 var overrides = try common.overrides.read_overrides(alloc, cp);
                 defer overrides.deinit();
 
-                best_match = (try overrides.active_version(dir_to_check)).ver;
+                best_match = try alloc.dupe(u8, (try overrides.active_version(dir_to_check)).ver);
             }
 
             const langref_path = try std.fs.path.join(alloc, &.{
