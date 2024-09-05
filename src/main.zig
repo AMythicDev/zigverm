@@ -3,8 +3,10 @@ const utils = @import("utils.zig");
 const builtin = @import("builtin");
 const Cli = @import("cli.zig").Cli;
 const common = @import("common");
-const Client = std.http.Client;
+const update_self = @import("update-self.zig");
 
+const Client = std.http.Client;
+const http = std.http;
 const paths = common.paths;
 const json = std.json;
 const File = std.fs.File;
@@ -117,6 +119,7 @@ pub fn main() !void {
             const directory = dir orelse try std.process.getCwdAlloc(alloc);
             try override_rm(alloc, cp, directory);
         },
+        Cli.update_self => try update_self.update_self(alloc, cp),
         Cli.update => |version_possible| {
             var versions: [][]const u8 = undefined;
             var check_installed = false;

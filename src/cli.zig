@@ -22,16 +22,17 @@ const helptext =
     \\                                              - An empty string to use the current directory
     \\      update [VERSION]                    Update version to its latest available point release, If [VERSION] is
     \\                                          not provided, it will update all installed versions
+    \\      update-self                         Update zigverm itself
     \\      std [VERSION]                       Open the standard library documentation in the default web browser.
     \\                                          If [VERSION] is specified, it will open the documentation for that version
     \\                                          otherwise it will default to of the active version on the current directory.
     \\      reference [VERSION]                 Open the language reference in the default web browser.
     \\                                          If [VERSION] is specified, it will open the reference for that version
     \\                                          otherwise it will default to of the active version on the current directory.
-    \\      remove <version>                    Remove a already installed specific version. Version can be any 
+    \\      remove <version>                    Remove a already installed specific version. Version can be any
     \\                                          valid semantic version or master or stable
     \\      info                                Show information about installations
-    \\    
+    \\
     \\Options:
     \\      -h  --help           Show this help message
     \\      -V  --version        Print version info
@@ -46,6 +47,7 @@ pub const Cli = union(enum) {
     install: []const u8,
     remove: []const u8,
     show,
+    update_self,
     override: OverrideArrgs,
     override_rm: ?[]const u8,
     update: ?[]const u8,
@@ -93,6 +95,8 @@ pub const Cli = union(enum) {
         } else if (streql(cmd, "-V") or streql(cmd, "--version")) {
             utils.printStdOut("{s}\n", .{Version});
             std.process.exit(0);
+        } else if (streql(cmd, "update-self")) {
+            command = Cli.update_self;
         } else if (streql(cmd, "override")) {
             const rel_or_directory = arg_iter.next() orelse return incorrectUsage(null);
             const rel = arg_iter.next();
