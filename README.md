@@ -1,5 +1,3 @@
-**zigvm has been renamed to zigverm for a better name. If you notice the zigvm name used anywhere in project source code, feel free to inform me.**
-
 # zigverm
 Version manager for the Zig Programming Language.
 
@@ -78,6 +76,7 @@ zig build --release=safe
 - [x] Continue download if previously interrupted
 - [x] Remove versions
 - [x] List down installed versions
+- [x] Update zigverm itself
 - [x] Manage default and per-directory version overrides
 - [x] Open the language reference and standard library docs (even when offline).
 - [x] Tries to maintain strong compatiblity with the wider zig ecosystem (`zls`, `zig.vim`)
