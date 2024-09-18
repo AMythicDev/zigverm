@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION="0.3.1"
+VERSION="0.4.0"
 
 if [[ -z $ZIGVERM_ROOT_DIR ]]; then
   ZIGVERM_ROOT_DIR=$HOME/.zigverm
