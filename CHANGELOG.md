@@ -1,6 +1,15 @@
 # Changelog
 This file documents all changes made to the project and is updated before each release.
 
+## v0.4.0
+### Added
+- Support to update zigverm itself
+
+### Fixed
+- Version and helptext printed to stderr instead of stdout
+- Retry download if hashes for download tarballs do not match.
+- Errors in detecting OS in install.sh
+
 ## v0.3.1 [2024-06-28]
 ### Fixed
 - Segfault when overriding
