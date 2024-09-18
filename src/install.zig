@@ -90,7 +90,7 @@ fn get_correct_tarball(alloc: Allocator, client: *Client, tarball_dw_filename: [
     return tarball;
 }
 
-fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, tb_writer: anytype, tarball_size: u64, total_size: usize) !void {
+pub fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, tb_writer: anytype, tarball_size: u64, total_size: usize) !void {
     std.log.info("Downloading {s}", .{tb_url});
     const tarball_uri = try std.Uri.parse(tb_url);
 
@@ -167,7 +167,7 @@ pub fn get_json_dslist(client: *Client) anyerror!JsonResponse {
 }
 
 pub fn make_request(client: *Client, uri: std.Uri) ?Client.Request {
-    var http_header_buff: [1024]u8 = undefined;
+    var http_header_buff: [8192]u8 = undefined;
     for (0..5) |i| {
         const tryreq = client.open(
             http.Method.GET,

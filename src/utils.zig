@@ -5,6 +5,8 @@ const CommonPaths = common.paths.CommonPaths;
 const streql = common.streql;
 const Release = common.Release;
 const release_name = common.release_name;
+const Client = std.http.Client;
+const http = std.http;
 
 const Allocator = std.mem.Allocator;
 const OsTag = std.Target.Os.Tag;
@@ -77,4 +79,22 @@ pub fn check_not_installed(alloc: Allocator, rel: Release, dirs: CommonPaths) !b
 pub fn printStdOut(comptime fmt: []const u8, args: anytype) void {
     const stdout = std.io.getStdOut().writer();
     nosuspend stdout.print(fmt, args) catch return;
+}
+
+pub fn make_request(client: *Client, uri: std.Uri) ?Client.Request {
+    var http_header_buff: [1024]u8 = undefined;
+    for (0..5) |i| {
+        const tryreq = client.open(
+            http.Method.GET,
+            uri,
+            Client.RequestOptions{ .server_header_buffer = &http_header_buff },
+        );
+        if (tryreq) |r| {
+            return r;
+        } else |err| {
+            std.log.warn("{}. Retrying again [{}/5]", .{ err, i + 1 });
+            std.time.sleep(std.time.ns_per_ms * 500);
+        }
+    }
+    return null;
 }
