@@ -5,8 +5,8 @@
 
     .dependencies = .{
         .zip = .{
-            .url = "../zip.zig",
-            .hash = "12205cc388e88fc23e53cdc494928c2994a6a56f979f72d3a7e9eba26a9fc75fc223",
+            .url = "https://github.com/AMythicDev/zip.zig/archive/refs/tags/v0.1.0.tar.gz",
+            .hash = "1220b5e3ecda108ccae1749479ec7e02f1f2ddcbb8102a2b5a7cd92bc8aebb4d153d",
         },
     },
 
