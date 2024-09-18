@@ -28,7 +28,7 @@ const DownloadTarball = struct {
     fn createDownloadFile(self: *Self, cp1: CommonPaths) !void {
         self.file_handle = try cp1.download_dir.createFile(self.filename, .{ .read = true, .truncate = false });
         self.writer = std.io.bufferedWriter(self.file_handle.?.writer());
-        self.file_size = (try self.file_handle.?.metadata()).size();
+        self.file_size = @intCast((try self.file_handle.?.metadata()).size());
     }
 
     fn deinit(self: *Self) !void {
