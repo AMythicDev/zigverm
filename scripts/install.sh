@@ -15,13 +15,14 @@ fi
 
 mkdir -p "$ZIGVERM_ROOT_DIR"/{downloads,installs,bin}
 
-OS=$(uname -s | awk '{print tolower($0)}')
-ARCH=$(uname -m | awk '{print tolower($0)}')
+OS="$(uname -s | awk '{print tolower($0)}')"
+ARCH="$(uname -m | awk '{print tolower($0)}')"
 
 if [ "${OS}" = "darwin" ]; then
   if [ "${ARCH}" = "x86_64" ] && [ "$(sysctl -in sysctl.proc_translated)" = "1" ]; then
     ARCH="arm64"
   fi
+  OS="macos"
 fi
 
 if  [ "${ARCH}" = "arm64" ]; then
