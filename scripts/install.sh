@@ -39,7 +39,7 @@ echo "Installing zig stable"
 echo "Setting default version to stable"
 "$ZIGVERM_ROOT_DIR"/bin/zigverm override default stable
 
-if [[ -x "$(command -v zigverm)" ]]; then
+if ! [[ -x "$(command -v zigverm)" ]]; then
     DEFAULT_SHELL=$(getent passwd "$USER" | awk -F: '{ print($NF) } ' | awk -F/ '{ print ($NF) }')
 
     case $DEFAULT_SHELL in

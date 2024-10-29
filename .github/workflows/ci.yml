@@ -48,6 +48,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/AMythicDev/zigverm/main/scripts/install.sh | bash
-      - run: echo $SHELL
       - run: ls ~/.zigverm
-      - run: bash -c zigverm
+      - run: zigverm
