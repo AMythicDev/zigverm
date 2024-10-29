@@ -21,8 +21,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ludeeus/action-shellcheck@2.0.0
         with:
-          scandir: './scripts/'
-
+          scandir: "./scripts/"
 
   build:
     strategy:
@@ -45,3 +44,10 @@ jobs:
       - run: zig build -Dtarget=${{ matrix.target }}
       - run: zig build test
 
+  install-script:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/AMythicDev/zigverm/main/scripts/install.sh | bash
+      - run: echo $SHELL
+      - run: ls ~/.zigverm
+      - run: bash -c zigverm
