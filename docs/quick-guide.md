@@ -50,11 +50,11 @@ zigverm update master
 
 - Updating the most recent patch version of specific minor version
 
+  Note that Specific versions installs like `0.10.1` are not updated whatsoever.
+
 ```sh
 zigverm update 0.12
 ```
-
-Specific versions installs like `0.10.1` are not updated whatsoever.
 
 - Updating zigverm itself
 
