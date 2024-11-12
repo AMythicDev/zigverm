@@ -220,6 +220,7 @@ fn update_zig_installation(alloc: Allocator, cp: CommonPaths, version_possible: 
         versions = @constCast(&[1][]const u8{v});
     } else versions = try installed_versions(alloc, cp);
 
+    var updated_now = std.ArrayList([]const u8).init(alloc);
     var already_update = std.ArrayList([]const u8).init(alloc);
     var client = Client{ .allocator = alloc };
     defer client.deinit();
@@ -262,6 +263,7 @@ fn update_zig_installation(alloc: Allocator, cp: CommonPaths, version_possible: 
                 }
             }
             if (to_update) {
+                try updated_now.append(v);
                 try install.install_release(alloc, &client, releases, &rel, cp);
             } else {
                 try already_update.append(v);
@@ -270,9 +272,11 @@ fn update_zig_installation(alloc: Allocator, cp: CommonPaths, version_possible: 
             try install.install_release(alloc, &client, releases, &rel, cp);
         }
     }
-    if (already_update.items.len > 0) std.debug.print("\n", .{});
-
+    std.debug.print("\n", .{});
+    for (updated_now.items) |v| {
+        std.debug.print("\t{s: <6}    :    Updated\n", .{v});
+    }
     for (already_update.items) |v| {
-        std.debug.print("\t{s: <6}    :    Up to date\n", .{v});
+        std.debug.print("\t{s: <6}    :    Already Up to date\n", .{v});
     }
 }
