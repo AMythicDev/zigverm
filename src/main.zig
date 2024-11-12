@@ -48,8 +48,8 @@ pub fn main() !void {
             try remove_release(alloc, rel, cp);
         },
         Cli.show => try show_info(alloc, cp),
-        Cli.std => |ver| open_std(ver),
-        Cli.reference => |ver| open_reference(alloc, ver),
+        Cli.std => |ver| try open_std(alloc, cp, ver),
+        Cli.reference => |ver| try open_reference(alloc, cp, ver),
         Cli.override => |oa| {
             var override_args = oa;
             const rel = try Release.releasefromVersion(override_args.version);
@@ -64,7 +64,7 @@ pub fn main() !void {
             try override_rm(alloc, cp, directory);
         },
         Cli.update_self => try update_self.update_self(alloc, cp),
-        Cli.update => |version_possible| update_zig_installation(alloc, cp, version_possible),
+        Cli.update => |version_possible| try update_zig_installation(alloc, cp, version_possible),
     }
 }
 
@@ -78,7 +78,7 @@ fn remove_release(alloc: Allocator, rel: Release, cp: CommonPaths) !void {
     std.log.info("Removed {s}", .{release_dir});
 }
 
-fn open_std(alloc: Allocator, ver: []const u8) void {
+fn open_std(alloc: Allocator, cp: CommonPaths, ver: ?[]const u8) !void {
     var best_match: []const u8 = undefined;
     if (ver) |v| {
         best_match = v;
@@ -105,7 +105,7 @@ fn open_std(alloc: Allocator, ver: []const u8) void {
     std.process.exit(term.Exited);
 }
 
-fn open_reference(alloc: Allocator, ver: []const u8) {
+fn open_reference(alloc: Allocator, cp: CommonPaths, ver: ?[]const u8) !void {
     var best_match: []const u8 = undefined;
     if (ver) |v| {
         best_match = v;
@@ -214,7 +214,7 @@ fn get_version_from_exe(alloc: Allocator, release_name: []const u8) !std.ArrayLi
     return version;
 }
 
-fn update_zig_installation(alloc: Allocator, cp: CommonPaths, version_possible: [][]const u8) !void {
+fn update_zig_installation(alloc: Allocator, cp: CommonPaths, version_possible: ?[]const u8) !void {
     var versions: [][]const u8 = undefined;
     if (version_possible) |v| {
         versions = @constCast(&[1][]const u8{v});
