@@ -61,9 +61,7 @@ pub const Release = struct {
 
         for (releases.object.keys()) |release| {
             if (streql(release, "master")) continue;
-
             var r = std.SemanticVersion.parse(release) catch unreachable;
-
             if (self.spec == .MajorMinorVersionSpec and (base_spec.major != r.major or base_spec.minor != r.minor)) continue;
 
             if (self.actual_version == null) {

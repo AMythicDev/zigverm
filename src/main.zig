@@ -48,64 +48,8 @@ pub fn main() !void {
             try remove_release(alloc, rel, cp);
         },
         Cli.show => try show_info(alloc, cp),
-        Cli.std => |ver| {
-            var best_match: []const u8 = undefined;
-            if (ver) |v| {
-                best_match = v;
-            } else {
-                const dir_to_check = try std.process.getCwdAlloc(alloc);
-                var overrides = try common.overrides.read_overrides(alloc, cp);
-                defer overrides.deinit();
-
-                best_match = try alloc.dupe(u8, (try overrides.active_version(dir_to_check)).ver);
-            }
-
-            const zig_path = try std.fs.path.join(alloc, &.{
-                common.paths.CommonPaths.get_zigverm_root(),
-                "installs/",
-                try common.release_name(alloc, try common.Release.releasefromVersion(best_match)),
-                "zig",
-            });
-
-            var executable = std.ArrayList([]const u8).init(alloc);
-            try executable.append(zig_path);
-            try executable.append("std");
-            var child = std.process.Child.init(executable.items, alloc);
-            const term = try child.spawnAndWait();
-            std.process.exit(term.Exited);
-        },
-        Cli.reference => |ver| {
-            var best_match: []const u8 = undefined;
-            if (ver) |v| {
-                best_match = v;
-            } else {
-                const dir_to_check = try std.process.getCwdAlloc(alloc);
-                var overrides = try common.overrides.read_overrides(alloc, cp);
-                defer overrides.deinit();
-
-                best_match = try alloc.dupe(u8, (try overrides.active_version(dir_to_check)).ver);
-            }
-
-            const langref_path = try std.fs.path.join(alloc, &.{
-                common.paths.CommonPaths.get_zigverm_root(),
-                "installs/",
-                try common.release_name(alloc, try common.Release.releasefromVersion(best_match)),
-                "doc",
-                "langref.html",
-            });
-
-            const main_exe = switch (builtin.os.tag) {
-                .windows => "explorer",
-                .macos => "open",
-                else => "xdg-open",
-            };
-
-            var executable = std.ArrayList([]const u8).init(alloc);
-            try executable.append(main_exe);
-            try executable.append(langref_path);
-            var child = std.process.Child.init(executable.items, alloc);
-            try child.spawn();
-        },
+        Cli.std => |ver| open_std(ver),
+        Cli.reference => |ver| open_reference(alloc, ver),
         Cli.override => |oa| {
             var override_args = oa;
             const rel = try Release.releasefromVersion(override_args.version);
@@ -120,68 +64,7 @@ pub fn main() !void {
             try override_rm(alloc, cp, directory);
         },
         Cli.update_self => try update_self.update_self(alloc, cp),
-        Cli.update => |version_possible| {
-            var versions: [][]const u8 = undefined;
-            if (version_possible) |v| {
-                versions = @constCast(&[1][]const u8{v});
-            } else versions = try installed_versions(alloc, cp);
-
-            var already_update = std.ArrayList([]const u8).init(alloc);
-            var client = Client{ .allocator = alloc };
-            defer client.deinit();
-            const resp = try install.get_json_dslist(&client);
-            const releases = try json.parseFromSliceLeaky(json.Value, alloc, resp.body[0..resp.length], .{});
-
-            for (versions) |v| {
-                var rel = try Release.releasefromVersion(v);
-                const release_name = try common.release_name(alloc, rel);
-                if (cp.install_dir.openDir(release_name, .{})) |_| {
-                    var to_update = false;
-                    if (rel.spec == common.ReleaseSpec.FullVersionSpec) {
-                        to_update = false;
-                    } else if (rel.spec == common.ReleaseSpec.Master) {
-                        const zig_version = try std.SemanticVersion.parse((try get_version_from_exe(alloc, release_name)).items);
-                        var next_master_release = try Release.releasefromVersion("master");
-                        try next_master_release.resolve(releases);
-                        if (zig_version.order(next_master_release.actual_version.?) != std.math.Order.eq) {
-                            to_update = false;
-                        }
-                    } else if (rel.spec == common.ReleaseSpec.Stable) {
-                        const zig_version = try std.SemanticVersion.parse((try get_version_from_exe(alloc, release_name)).items);
-                        var next_stable_release = try Release.releasefromVersion("stable");
-                        try next_stable_release.resolve(releases);
-
-                        if (next_stable_release.actual_version.?.order(zig_version) == std.math.Order.gt) {
-                            to_update = true;
-                        }
-                    } else {
-                        var zig_version = try std.SemanticVersion.parse((try get_version_from_exe(alloc, release_name)).items);
-                        var format_buf: [32]u8 = undefined;
-                        var format_buf_stream = std.io.fixedBufferStream(&format_buf);
-                        zig_version.patch += 1;
-                        try zig_version.format("", .{}, format_buf_stream.writer());
-                        to_update = releases.object.contains(format_buf_stream.getWritten());
-                        while (releases.object.contains(format_buf_stream.getWritten())) {
-                            zig_version.patch += 1;
-                            try format_buf_stream.seekTo(0);
-                            try zig_version.format("", .{}, format_buf_stream.writer());
-                        }
-                    }
-                    if (to_update) {
-                        try install.install_release(alloc, &client, releases, &rel, cp);
-                    } else {
-                        try already_update.append(v);
-                    }
-                } else |_| {
-                    try install.install_release(alloc, &client, releases, &rel, cp);
-                }
-            }
-            if (already_update.items.len > 0) std.debug.print("\n", .{});
-
-            for (already_update.items) |v| {
-                std.debug.print("\t{s}    :    Up to date\n", .{v});
-            }
-        },
+        Cli.update => |version_possible| update_zig_installation(alloc, cp, version_possible),
     }
 }
 
@@ -193,6 +76,66 @@ fn remove_release(alloc: Allocator, rel: Release, cp: CommonPaths) !void {
     const release_dir = try common.release_name(alloc, rel);
     try cp.install_dir.deleteTree(release_dir);
     std.log.info("Removed {s}", .{release_dir});
+}
+
+fn open_std(alloc: Allocator, ver: []const u8) void {
+    var best_match: []const u8 = undefined;
+    if (ver) |v| {
+        best_match = v;
+    } else {
+        const dir_to_check = try std.process.getCwdAlloc(alloc);
+        var overrides = try common.overrides.read_overrides(alloc, cp);
+        defer overrides.deinit();
+
+        best_match = try alloc.dupe(u8, (try overrides.active_version(dir_to_check)).ver);
+    }
+
+    const zig_path = try std.fs.path.join(alloc, &.{
+        common.paths.CommonPaths.get_zigverm_root(),
+        "installs/",
+        try common.release_name(alloc, try common.Release.releasefromVersion(best_match)),
+        "zig",
+    });
+
+    var executable = std.ArrayList([]const u8).init(alloc);
+    try executable.append(zig_path);
+    try executable.append("std");
+    var child = std.process.Child.init(executable.items, alloc);
+    const term = try child.spawnAndWait();
+    std.process.exit(term.Exited);
+}
+
+fn open_reference(alloc: Allocator, ver: []const u8) {
+    var best_match: []const u8 = undefined;
+    if (ver) |v| {
+        best_match = v;
+    } else {
+        const dir_to_check = try std.process.getCwdAlloc(alloc);
+        var overrides = try common.overrides.read_overrides(alloc, cp);
+        defer overrides.deinit();
+
+        best_match = try alloc.dupe(u8, (try overrides.active_version(dir_to_check)).ver);
+    }
+
+    const langref_path = try std.fs.path.join(alloc, &.{
+        common.paths.CommonPaths.get_zigverm_root(),
+        "installs/",
+        try common.release_name(alloc, try common.Release.releasefromVersion(best_match)),
+        "doc",
+        "langref.html",
+    });
+
+    const main_exe = switch (builtin.os.tag) {
+        .windows => "explorer",
+        .macos => "open",
+        else => "xdg-open",
+    };
+
+    var executable = std.ArrayList([]const u8).init(alloc);
+    try executable.append(main_exe);
+    try executable.append(langref_path);
+    var child = std.process.Child.init(executable.items, alloc);
+    try child.spawn();
 }
 
 fn show_info(alloc: Allocator, cp: CommonPaths) !void {
@@ -269,4 +212,67 @@ fn get_version_from_exe(alloc: Allocator, release_name: []const u8) !std.ArrayLi
     _ = version.pop();
 
     return version;
+}
+
+fn update_zig_installation(alloc: Allocator, cp: CommonPaths, version_possible: [][]const u8) !void {
+    var versions: [][]const u8 = undefined;
+    if (version_possible) |v| {
+        versions = @constCast(&[1][]const u8{v});
+    } else versions = try installed_versions(alloc, cp);
+
+    var already_update = std.ArrayList([]const u8).init(alloc);
+    var client = Client{ .allocator = alloc };
+    defer client.deinit();
+    const resp = try install.get_json_dslist(&client);
+    const releases = try json.parseFromSliceLeaky(json.Value, alloc, resp.body[0..resp.length], .{});
+
+    for (versions) |v| {
+        var rel = try Release.releasefromVersion(v);
+        const release_name = try common.release_name(alloc, rel);
+        if (cp.install_dir.openDir(release_name, .{})) |_| {
+            var to_update = false;
+            if (rel.spec == common.ReleaseSpec.FullVersionSpec) {
+                to_update = false;
+            } else if (rel.spec == common.ReleaseSpec.Master) {
+                const zig_version = try std.SemanticVersion.parse((try get_version_from_exe(alloc, release_name)).items);
+                var next_master_release = try Release.releasefromVersion("master");
+                try next_master_release.resolve(releases);
+                if (zig_version.order(next_master_release.actual_version.?) != std.math.Order.eq) {
+                    to_update = false;
+                }
+            } else if (rel.spec == common.ReleaseSpec.Stable) {
+                const zig_version = try std.SemanticVersion.parse((try get_version_from_exe(alloc, release_name)).items);
+                var next_stable_release = try Release.releasefromVersion("stable");
+                try next_stable_release.resolve(releases);
+
+                if (next_stable_release.actual_version.?.order(zig_version) == std.math.Order.gt) {
+                    to_update = true;
+                }
+            } else {
+                var zig_version = try std.SemanticVersion.parse((try get_version_from_exe(alloc, release_name)).items);
+                var format_buf: [32]u8 = undefined;
+                var format_buf_stream = std.io.fixedBufferStream(&format_buf);
+                zig_version.patch += 1;
+                try zig_version.format("", .{}, format_buf_stream.writer());
+                to_update = releases.object.contains(format_buf_stream.getWritten());
+                while (releases.object.contains(format_buf_stream.getWritten())) {
+                    zig_version.patch += 1;
+                    try format_buf_stream.seekTo(0);
+                    try zig_version.format("", .{}, format_buf_stream.writer());
+                }
+            }
+            if (to_update) {
+                try install.install_release(alloc, &client, releases, &rel, cp);
+            } else {
+                try already_update.append(v);
+            }
+        } else |_| {
+            try install.install_release(alloc, &client, releases, &rel, cp);
+        }
+    }
+    if (already_update.items.len > 0) std.debug.print("\n", .{});
+
+    for (already_update.items) |v| {
+        std.debug.print("\t{s}    :    Up to date\n", .{v});
+    }
 }
