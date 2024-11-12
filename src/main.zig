@@ -273,6 +273,6 @@ fn update_zig_installation(alloc: Allocator, cp: CommonPaths, version_possible: 
     if (already_update.items.len > 0) std.debug.print("\n", .{});
 
     for (already_update.items) |v| {
-        std.debug.print("\t{s}    :    Up to date\n", .{v});
+        std.debug.print("\t{s: <6}    :    Up to date\n", .{v});
     }
 }
