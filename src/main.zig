@@ -30,10 +30,10 @@ pub fn main() !void {
     switch (command) {
         Cli.install => |version| {
             var rel = try Release.releasefromVersion(version);
-            if (!(try utils.check_not_installed(alloc, rel, cp))) {
+            if (cp.install_dir.openDir(try common.release_name(alloc, rel), .{})) |_| {
                 std.log.err("Version already installled. Quitting", .{});
                 std.process.exit(0);
-            }
+            } else |_| {}
 
             var client = Client{ .allocator = alloc };
             defer client.deinit();
@@ -122,13 +122,11 @@ pub fn main() !void {
         Cli.update_self => try update_self.update_self(alloc, cp),
         Cli.update => |version_possible| {
             var versions: [][]const u8 = undefined;
-            var check_installed = false;
             if (version_possible) |v| {
                 versions = @constCast(&[1][]const u8{v});
-                check_installed = true;
             } else versions = try installed_versions(alloc, cp);
 
-            var uptodate = std.ArrayList([]const u8).init(alloc);
+            var already_update = std.ArrayList([]const u8).init(alloc);
             var client = Client{ .allocator = alloc };
             defer client.deinit();
             const resp = try install.get_json_dslist(&client);
@@ -136,19 +134,51 @@ pub fn main() !void {
 
             for (versions) |v| {
                 var rel = try Release.releasefromVersion(v);
-                if (check_installed and try utils.check_not_installed(alloc, rel, cp)) {
-                    try install.install_release(alloc, &client, releases, &rel, cp);
-                    return;
-                }
-                if (rel.spec == common.ReleaseSpec.FullVersionSpec) {
-                    try uptodate.append(v);
-                    continue;
-                }
-                try install.install_release(alloc, &client, releases, &rel, cp);
-            }
-            if (uptodate.items.len > 0) std.debug.print("\n", .{});
+                const release_name = try common.release_name(alloc, rel);
+                if (cp.install_dir.openDir(release_name, .{})) |_| {
+                    var to_update = false;
+                    if (rel.spec == common.ReleaseSpec.FullVersionSpec) {
+                        to_update = false;
+                    } else if (rel.spec == common.ReleaseSpec.Master) {
+                        const zig_version = try std.SemanticVersion.parse((try get_version_from_exe(alloc, release_name)).items);
+                        var next_master_release = try Release.releasefromVersion("master");
+                        try next_master_release.resolve(releases);
+                        if (zig_version.order(next_master_release.actual_version.?) != std.math.Order.eq) {
+                            to_update = false;
+                        }
+                    } else if (rel.spec == common.ReleaseSpec.Stable) {
+                        const zig_version = try std.SemanticVersion.parse((try get_version_from_exe(alloc, release_name)).items);
+                        var next_stable_release = try Release.releasefromVersion("stable");
+                        try next_stable_release.resolve(releases);
 
-            for (uptodate.items) |v| {
+                        if (next_stable_release.actual_version.?.order(zig_version) == std.math.Order.gt) {
+                            to_update = true;
+                        }
+                    } else {
+                        var zig_version = try std.SemanticVersion.parse((try get_version_from_exe(alloc, release_name)).items);
+                        var format_buf: [32]u8 = undefined;
+                        var format_buf_stream = std.io.fixedBufferStream(&format_buf);
+                        zig_version.patch += 1;
+                        try zig_version.format("", .{}, format_buf_stream.writer());
+                        to_update = releases.object.contains(format_buf_stream.getWritten());
+                        while (releases.object.contains(format_buf_stream.getWritten())) {
+                            zig_version.patch += 1;
+                            try format_buf_stream.seekTo(0);
+                            try zig_version.format("", .{}, format_buf_stream.writer());
+                        }
+                    }
+                    if (to_update) {
+                        try install.install_release(alloc, &client, releases, &rel, cp);
+                    } else {
+                        try already_update.append(v);
+                    }
+                } else |_| {
+                    try install.install_release(alloc, &client, releases, &rel, cp);
+                }
+            }
+            if (already_update.items.len > 0) std.debug.print("\n", .{});
+
+            for (already_update.items) |v| {
                 std.debug.print("\t{s}    :    Up to date\n", .{v});
             }
         },
@@ -156,10 +186,10 @@ pub fn main() !void {
 }
 
 fn remove_release(alloc: Allocator, rel: Release, cp: CommonPaths) !void {
-    if ((try utils.check_not_installed(alloc, rel, cp))) {
+    if (cp.install_dir.openDir(try common.release_name(alloc, rel), .{})) |_| {
         std.log.err("Version not installled. Quitting", .{});
         std.process.exit(0);
-    }
+    } else |_| {}
     const release_dir = try common.release_name(alloc, rel);
     try cp.install_dir.deleteTree(release_dir);
     std.log.info("Removed {s}", .{release_dir});
@@ -218,4 +248,25 @@ fn installed_versions(alloc: Allocator, cp: CommonPaths) ![][]const u8 {
         try versions.append(try alloc.dupe(u8, version));
     }
     return versions.items;
+}
+
+fn get_version_from_exe(alloc: Allocator, release_name: []const u8) !std.ArrayList(u8) {
+    var executable = [2][]const u8{ undefined, "version" };
+    executable[0] = try std.fs.path.join(alloc, &.{
+        common.paths.CommonPaths.get_zigverm_root(),
+        "installs/",
+        release_name,
+        "zig",
+    });
+    var version = std.ArrayList(u8).init(alloc);
+    var stderr = std.ArrayList(u8).init(alloc);
+    var child = std.process.Child.init(&executable, alloc);
+    child.stdout_behavior = .Pipe;
+    child.stderr_behavior = .Pipe;
+    try child.spawn();
+    try child.collectOutput(&version, &stderr, 256);
+    _ = try child.wait();
+    _ = version.pop();
+
+    return version;
 }

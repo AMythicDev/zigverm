@@ -72,10 +72,6 @@ pub inline fn is_valid_arch_os(arch: ?[]const u8, os: ?[]const u8) bool {
     return result;
 }
 
-pub fn check_not_installed(alloc: Allocator, rel: Release, dirs: CommonPaths) !bool {
-    return dirs.install_dir.access(try release_name(alloc, rel), .{}) == std.fs.Dir.AccessError.FileNotFound;
-}
-
 pub fn printStdOut(comptime fmt: []const u8, args: anytype) void {
     const stdout = std.io.getStdOut().writer();
     nosuspend stdout.print(fmt, args) catch return;

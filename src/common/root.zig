@@ -46,7 +46,11 @@ pub const Release = struct {
     }
 
     pub fn resolve(self: *Self, releases: json.Value) RelError!void {
-        if (self.spec == ReleaseSpec.Master or self.spec == ReleaseSpec.FullVersionSpec) return;
+        if (self.spec == ReleaseSpec.FullVersionSpec) return;
+        if (self.spec == ReleaseSpec.Master) {
+            self.actual_version = std.SemanticVersion.parse(releases.object.get("master").?.object.get("version").?.string) catch unreachable;
+            return;
+        }
 
         var base_spec: std.SemanticVersion = undefined;
         if (self.spec == .Stable) {
