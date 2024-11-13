@@ -4,10 +4,10 @@ zigverm is a version manager for the [Zig](https://ziglang.org) programming Lang
 
 ## Platform Support
 
-Legend:
-🎉 - Binary releases + automatic installer available
-💪 - binary releases available
-❌ - No binary releases. Maybe supported later. Requires [compiling](#compiling)
+Legend:  
+🎉 - Binary releases + automatic installer available  
+💪 - binary releases available  
+❌ - No binary releases. Maybe supported later. Requires [compiling](#compiling)  
 \- - Not applicable
 
 | OS/Arch | x86_64 | x86 | aarch64 | armv7a | riscv64 |
