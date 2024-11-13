@@ -1,27 +1,25 @@
 # zigverm
-Version manager for the Zig Programming Language.
 
-It lets you install and manage your Zig installation.
-
-**zigverm is in early stages of its development, it can do [basic things](#features) and platform
-support may not be on par with other version managers. If you encounter issues or want to request a
-feature be sure to drop a issue on the GitHub issue tracker.**
+zigverm is a version manager for the [Zig](https://ziglang.org) programming Language. It lets you install Zig and further manage your installation.
 
 ## Platform Support
-Legend:  
-🎉 - Binary releases + automatic installer available  
-💪 - binary releases available  
-❌ - No binary releases. Maybe supported later. Requires [compiling](#compiling)  
+
+Legend:
+🎉 - Binary releases + automatic installer available
+💪 - binary releases available
+❌ - No binary releases. Maybe supported later. Requires [compiling](#compiling)
 \- - Not applicable
 
 | OS/Arch | x86_64 | x86 | aarch64 | armv7a | riscv64 |
-|---------|--------|-----|---------|--------|---------|
-| Windows |   💪   |  💪 |    ❌   |   -    |    -    |
-| Linux   |   🎉   |  🎉 |    🎉   |   ❌   |    ❌   |  
-| MacOS   |   🎉   |  -  |    🎉   |   -    |    -    |
+| ------- | ------ | --- | ------- | ------ | ------- |
+| Windows | 💪     | 💪  | ❌      | -      | -       |
+| Linux   | 🎉     | 🎉  | 🎉      | ❌     | ❌      |
+| MacOS   | 🎉     | -   | 🎉      | -      | -       |
 
 ## Installation
-### For Linux and MacOS (x86_64+aarch64)
+
+### For Linux and MacOS (x86_64/aarch64)
+
 You can use this automated install script which will install zigverm along with the latest version of Zig
 
 ```sh
@@ -37,41 +35,50 @@ The script will also put the installation directory's `bin` folder to your `$PAT
 this it will append a line to your `$HOME/.profile` and your shell's rc file. The file for each
 shell supported is listed below:
 
-- Bash: `$HOME/.bashrc` 
+- Bash: `$HOME/.bashrc`
 - Zsh: `$HOME/.zshrc`
 - Fish: `$XDG_CONFIG_HOME/fish/config.fish`, if not set then uses `$HOME/.config/fish/config.fish`
 
 ### For Windows
-* Create the following folder structure in `C:\Users\[YOU-USERNAME]\.zigverm`:
+
+- Create the following folder structure in `C:\Users\[YOU-USERNAME]\.zigverm`:
+
 ```
 .
 ├── bin
 ├── downloads
 └── installs
 ```
-* Download the latest release for Windows from GitHub and extract it.
-* Copy `zigverm.exe` and `zig.exe` to the `bin/` folder.
-* Ass the `bin` directory to your `PATH` enviroment variable
+
+- Download the latest release for Windows from GitHub and extract it.
+- Copy `zigverm.exe` and `zig.exe` to the `bin/` folder.
+- Ass the `bin` directory to your `PATH` enviroment variable
 
 ### Compiling
-Requirements:  
-- Zig >= 0.12.0
+
+Requirements:
+
+- Zig >= 0.12.0. Note that Zig master versions are not supported.
 - libc on non-Windows systems. Can be provided by Zig itself, if available for the platform.
 - `git`, if you want to compile the latest commit or you want to develop `zigverm`.
 
 Now to compile:
+
 - Clone the repo or download a source archive depending on if you want to compile the latest `main`
-branck or a release.
+  branck or a release.
 - Extract the archive and change into the extracted directory.
 - Run the following command
+
 ```
 zig build --release=safe
 ```
+
 - If you are devloping `zigverm`, you can omit the `--release=safe` flag.
 - You will have `zigverm` and `zig` in `zig-out/bin/` directory
-- Lastly follow the same steps [for windows](#for-windows) 
+- Lastly follow the same steps [for windows](#for-windows)
 
 ## Features
+
 - [x] Install versions (master, stable, x.y x.y.z)
 - [x] Continue download if previously interrupted
 - [x] Remove versions
@@ -82,7 +89,9 @@ zig build --release=safe
 - [x] Tries to maintain strong compatiblity with the wider zig ecosystem (`zls`, `zig.vim`)
 
 ## Docs
+
 Read the [quick guide](./docs/quick-guide.md)
 
 ## License
+
 `zigverm` is licensed under the Apache License 2.0. See the [LICENSE](./LICENSE) file.
