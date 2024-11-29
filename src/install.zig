@@ -132,7 +132,7 @@ pub fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, t
         _ = try tb_writer.write(buff[0..len]);
 
         dlnow += @floatFromInt(len);
-        const pcnt_complete: u8 = @intFromFloat(@round(dlnow * 100 / total_size_double));
+        const pcnt_complete: u8 = @intFromFloat(dlnow * 100 / total_size_double);
         var timer = try std.time.Timer.start();
         const newbars: u8 = pcnt_complete / 2;
         for (bars..newbars) |i| {
