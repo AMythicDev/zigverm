@@ -117,7 +117,6 @@ pub fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, t
 
     var progress_bar: [150]u8 = ("░" ** 50).*;
     var stderr_writer = std.io.getStdErr().writer();
-
     var buff: [1024]u8 = undefined;
     var bars: u8 = 0;
 
@@ -136,15 +135,12 @@ pub fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, t
         const pcnt_complete: u8 = @intFromFloat(@round(dlnow * 100 / total_size_double));
         var timer = try std.time.Timer.start();
         const newbars: u8 = pcnt_complete / 2;
-
-        if (newbars > bars) {
-            for (bars..newbars) |i| {
-                std.mem.copyForwards(u8, progress_bar[i * 3 .. i * 3 + 3], "█");
-            }
-            const dlspeed = @as(f64, @floatFromInt(dlnow)) / 1024 * 8 / @as(f64, @floatFromInt(timer.read()));
-            try stderr_writer.print("\r\t\x1b[33m{s}\x1b[0m{s} {d}% {d:.1}kb/s", .{ progress_bar[0 .. newbars * 3], progress_bar[newbars * 3 ..], pcnt_complete, dlspeed });
-            bars = newbars;
+        for (bars..newbars) |i| {
+            std.mem.copyForwards(u8, progress_bar[i * 3 .. i * 3 + 3], "█");
         }
+        bars = newbars;
+        const dlspeed = dlnow / 1024 * 8 / @as(f64, @floatFromInt(timer.read()));
+        try stderr_writer.print("\r\t\x1b[33m{s}\x1b[0m{s} {d}% {d:.1}kb/s", .{ progress_bar[0 .. newbars * 3], progress_bar[newbars * 3 ..], pcnt_complete, dlspeed });
     }
     try stderr_writer.print("\n", .{});
     try tb_writer.flush();
