@@ -119,8 +119,12 @@ pub fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, t
     var stderr_writer = std.io.getStdErr().writer();
 
     var buff: [1024]u8 = undefined;
-    var dlnow: u64 = tarball_size;
     var bars: u8 = 0;
+
+    // Convert everything into f64 for less typing in calculating % download and download speed
+    var dlnow: f64 = @floatFromInt(tarball_size);
+    const total_size_double: f64 = @floatFromInt(total_size);
+
     while (true) {
         const len = try reader.read(&buff);
         if (len == 0) {
@@ -128,8 +132,8 @@ pub fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, t
         }
         _ = try tb_writer.write(buff[0..len]);
 
-        dlnow += len;
-        const pcnt_complete: u8 = @intCast((dlnow * 100 / total_size));
+        dlnow += @floatFromInt(len);
+        const pcnt_complete: u8 = @intFromFloat(@round(dlnow * 100 / total_size_double));
         var timer = try std.time.Timer.start();
         const newbars: u8 = pcnt_complete / 2;
 
