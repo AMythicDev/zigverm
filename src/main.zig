@@ -69,13 +69,14 @@ pub fn main() !void {
 }
 
 fn remove_release(alloc: Allocator, rel: Release, cp: CommonPaths) !void {
-    if (cp.install_dir.openDir(try common.release_name(alloc, rel), .{})) |_| {
-        std.log.err("Version not installled. Quitting", .{});
-        std.process.exit(0);
-    } else |_| {}
     const release_dir = try common.release_name(alloc, rel);
-    try cp.install_dir.deleteTree(release_dir);
-    std.log.info("Removed {s}", .{release_dir});
+    if (cp.install_dir.openDir(release_dir, .{})) |_| {
+        try cp.install_dir.deleteTree(release_dir);
+        std.log.info("Removed {s}", .{release_dir});
+    } else |_| {
+        std.log.err("Version not installled. Quitting", .{});
+        std.process.exit(1);
+    }
 }
 
 fn open_std(alloc: Allocator, cp: CommonPaths, ver: ?[]const u8) !void {
