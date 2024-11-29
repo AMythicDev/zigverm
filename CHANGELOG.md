@@ -2,6 +2,13 @@
 
 This file documents all changes made to the project and is updated before each release.
 
+## v0.5.1 [2024-11-29]
+
+### Fixed
+
+- Fixed various bugs with terminal progress bar
+- Fixed bug where calling remove on an installed version would quit zigverm with a `Version not installed. Quitting` message.
+
 ## v0.5.0 [2024-11-13]
 
 ### Added
