@@ -58,7 +58,7 @@ shell supported is listed below:
 
 Requirements:
 
-- Zig >= 0.12.0. Note that Zig master versions are not supported.
+- Zig >= 0.12.0. See [this] for Zig v0.14.
 - libc on non-Windows systems. Can be provided by Zig itself, if available for the platform.
 - `git`, if you want to compile the latest commit or you want to develop `zigverm`.
 
@@ -76,6 +76,12 @@ zig build --release=safe
 - If you are devloping `zigverm`, you can omit the `--release=safe` flag.
 - You will have `zigverm` and `zig` in `zig-out/bin/` directory
 - Lastly follow the same steps [for windows](#for-windows)
+
+#### Note for Zig >= v0.14
+There have been some API changes in Zig v0.14 (not released yet) which makes zigverm fail 
+to compile on these versions of Zig. All the changes required to fix this is issue is being 
+tracked in [this](https://github.com/AMythicDev/zigverm/pull/2) PR. It will be merged into 
+main once this version of Zig comes out.
 
 ## Features
 
