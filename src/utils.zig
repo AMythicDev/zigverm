@@ -19,7 +19,7 @@ pub fn check_install_name(name: []const u8) bool {
     if (!std.mem.startsWith(u8, name, "zig-")) {
         return false;
     }
-    var components = std.mem.split(u8, name[4..], "-");
+    var components = std.mem.splitScalar(u8, name[4..], '-');
 
     const arch = components.next();
     const os = components.next();
