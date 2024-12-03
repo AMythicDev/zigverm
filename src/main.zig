@@ -202,7 +202,7 @@ fn installed_versions(alloc: Allocator, cp: CommonPaths) ![][]const u8 {
     var versions = std.ArrayList([]const u8).init(alloc);
     while (try iter.next()) |i| {
         if (!utils.check_install_name(i.name)) continue;
-        var components = std.mem.split(u8, i.name[4..], "-");
+        var components = std.mem.splitScalar(u8, i.name[4..], '-');
         _ = components.next();
         _ = components.next();
         const version = components.next() orelse unreachable;
