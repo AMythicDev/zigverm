@@ -16,9 +16,8 @@ const helptext =
     \\                                              - Path to a directory, under which to override
     \\                                              - "default", to change the default version
     \\                                              - ommited to use the current directory
-    \\      override-rm [DIRECTORY]             Override the version of zig used under DIRECTORY. DIRECTORY can be
-    \\                                              - Path to a directory, under which to remove override
-    \\                                              - An empty string to remove for the current directory
+    \\      override-rm <DIRECTORY>             Override the version of zig used under DIRECTORY. DIRECTORY should
+    \\                                          be path to a directory, for which to remove override
     \\      update [VERSION]                    Update version to its latest available point release, If [VERSION] is
     \\                                          not provided, it will update all installed versions
     \\      update-self                         Update zigverm itself
@@ -111,7 +110,7 @@ pub const Cli = union(enum) {
 
             command = Cli{ .override = override_args };
         } else if (streql(cmd, "override-rm")) {
-            const directory = arg_iter.next();
+            const directory = arg_iter.next() orelse return incorrectUsage(null);
             command = Cli{ .override_rm = directory };
         } else incorrectUsage(cmd);
 
