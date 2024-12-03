@@ -6,6 +6,7 @@ pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
     const zip = b.dependency("zip", .{});
+    const cova = b.dependency("cova", .{});
 
     const common = b.createModule(.{ .root_source_file = b.path("src/common/root.zig") });
     const default_os = target.result.os.tag;
@@ -32,6 +33,7 @@ pub fn build(b: *std.Build) !void {
 
     zigverm.root_module.addImport("common", common);
     zigverm.root_module.addImport("zip", zip.module("zip"));
+    zigverm.root_module.addImport("cova", cova.module("cova"));
     zig.root_module.addImport("common", common);
     b.installArtifact(zigverm);
     b.installArtifact(zig);
