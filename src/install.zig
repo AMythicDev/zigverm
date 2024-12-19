@@ -12,6 +12,8 @@ const CommonPaths = paths.CommonPaths;
 const http = std.http;
 const Sha256 = std.crypto.hash.sha2.Sha256;
 const release_name = common.release_name;
+const AtomicOrder = std.builtin.AtomicOrder;
+const time = std.time;
 
 const default_os = builtin.target.os.tag;
 const default_arch = builtin.target.cpu.arch;
@@ -115,15 +117,13 @@ pub fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, t
     try req.?.wait();
     var reader = req.?.reader();
 
-    var progress_bar: [150]u8 = ("░" ** 50).*;
-    var stderr_writer = std.io.getStdErr().writer();
     var buff: [1024]u8 = undefined;
-    var bars: u8 = 0;
 
     // Convert everything into f64 for less typing in calculating % download and download speed
-    var dlnow: f64 = @floatFromInt(tarball_size);
+    var dlnow = std.atomic.Value(f64).init(0);
     const total_size_double: f64 = @floatFromInt(total_size);
 
+    const progress_thread = try std.Thread.spawn(.{}, download_progress_bar, .{ &dlnow, @as(f64, @floatFromInt(tarball_size)), total_size_double });
     while (true) {
         const len = try reader.read(&buff);
         if (len == 0) {
@@ -131,19 +131,35 @@ pub fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, t
         }
         _ = try tb_writer.write(buff[0..len]);
 
-        dlnow += @floatFromInt(len);
-        const pcnt_complete: u8 = @intFromFloat(dlnow * 100 / total_size_double);
-        var timer = try std.time.Timer.start();
+        _ = dlnow.fetchAdd(@floatFromInt(len), AtomicOrder.monotonic);
+    }
+    progress_thread.join();
+    try tb_writer.flush();
+}
+
+pub fn download_progress_bar(dlnow: *std.atomic.Value(f64), tarball_size: f64, total_size: f64) !void {
+    var stderr_writer = std.io.getStdErr().writer();
+    var progress_bar: [150]u8 = ("░" ** 50).*;
+    var bars: u8 = 0;
+    var timer = try time.Timer.start();
+    var downloaded = dlnow.load(AtomicOrder.monotonic);
+
+    while (true) {
+        const pcnt_complete: u8 = @intFromFloat((downloaded + tarball_size) * 100 / total_size);
         const newbars: u8 = pcnt_complete / 2;
         for (bars..newbars) |i| {
             std.mem.copyForwards(u8, progress_bar[i * 3 .. i * 3 + 3], "█");
         }
         bars = newbars;
-        const dlspeed = dlnow / 1024 * 8 / @as(f64, @floatFromInt(timer.read()));
-        try stderr_writer.print("\r\t\x1b[33m{s}\x1b[0m{s} {d}% {d:.1}kb/s", .{ progress_bar[0 .. newbars * 3], progress_bar[newbars * 3 ..], pcnt_complete, dlspeed });
+        const speed = downloaded / 1024 / @as(f64, @floatFromInt(timer.read() / time.ns_per_s));
+        try stderr_writer.print("\r\t\x1b[33m{s}\x1b[0m{s} {d}% {d:.1}KB/s", .{ progress_bar[0 .. newbars * 3], progress_bar[newbars * 3 ..], pcnt_complete, speed });
+
+        if (downloaded + tarball_size == total_size) break;
+
+        std.time.sleep(500 * time.ns_per_ms);
+        downloaded = dlnow.load(AtomicOrder.monotonic);
     }
     try stderr_writer.print("\n", .{});
-    try tb_writer.flush();
 }
 
 pub fn get_json_dslist(client: *Client) anyerror!JsonResponse {
