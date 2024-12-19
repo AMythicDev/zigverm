@@ -152,7 +152,7 @@ pub fn download_progress_bar(dlnow: *std.atomic.Value(f64), tarball_size: f64, t
         }
         bars = newbars;
         const speed = downloaded / 1024 / @as(f64, @floatFromInt(timer.read() / time.ns_per_s));
-        try stderr_writer.print("\r\t\x1b[33m{s}\x1b[0m{s} {d}% {d:.1}KB/s", .{ progress_bar[0 .. newbars * 3], progress_bar[newbars * 3 ..], pcnt_complete, speed });
+        try stderr_writer.print("\x1b[G\x1b[0K\t\x1b[33m{s}\x1b[0m{s} {d}% {d:.1}KB/s", .{ progress_bar[0 .. newbars * 3], progress_bar[newbars * 3 ..], pcnt_complete, speed });
 
         if (downloaded + tarball_size == total_size) break;
 
