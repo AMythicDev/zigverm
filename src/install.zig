@@ -120,7 +120,7 @@ pub fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, t
     var buff: [1024]u8 = undefined;
 
     // Convert everything into f64 for less typing in calculating % download and download speed
-    var dlnow = std.atomic.Value(f64).init(0);
+    var dlnow = std.atomic.Value(f32).init(0);
     const total_size_double: f64 = @floatFromInt(total_size);
 
     const progress_thread = try std.Thread.spawn(.{}, download_progress_bar, .{ &dlnow, @as(f64, @floatFromInt(tarball_size)), total_size_double });
@@ -137,7 +137,7 @@ pub fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, t
     try tb_writer.flush();
 }
 
-pub fn download_progress_bar(dlnow: *std.atomic.Value(f64), tarball_size: f64, total_size: f64) !void {
+pub fn download_progress_bar(dlnow: *std.atomic.Value(f32), tarball_size: f64, total_size: f64) !void {
     var stderr_writer = std.io.getStdErr().writer();
     var progress_bar: [150]u8 = ("░" ** 50).*;
     var bars: u8 = 0;
