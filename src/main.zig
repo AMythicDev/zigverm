@@ -1,10 +1,13 @@
 const std = @import("std");
 const utils = @import("utils.zig");
 const builtin = @import("builtin");
-const Cli = @import("cli.zig").Cli;
+const cli = @import("cli.zig");
 const common = @import("common");
 const update_self = @import("update-self.zig");
+const cova = @import("cova");
 
+const Cli = cli.Cli;
+const CommandT = cli.CommandT;
 const Client = std.http.Client;
 const http = std.http;
 const paths = common.paths;
@@ -22,50 +25,53 @@ pub fn main() !void {
     var aa = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     const alloc = aa.allocator();
 
-    const command = try Cli.read_args(alloc);
+    const command = try Cli.init(alloc, .{});
+    var args_iter = try cova.ArgIteratorGeneric.init(alloc);
+    const stdout = std.io.getStdOut().writer();
 
+    try cova.parseArgs(&args_iter, CommandT, command, stdout, .{});
     var cp = try CommonPaths.resolve(alloc);
     defer cp.close();
 
-    switch (command) {
-        Cli.install => |version| {
-            var rel = try Release.releasefromVersion(version);
-            if (cp.install_dir.openDir(try common.release_name(alloc, rel), .{})) |_| {
-                std.log.err("Version already installled. Quitting", .{});
-                std.process.exit(0);
-            } else |_| {}
-
-            var client = Client{ .allocator = alloc };
-            defer client.deinit();
-
-            const resp = try install.get_json_dslist(&client);
-            const releases = try json.parseFromSliceLeaky(json.Value, alloc, resp.body[0..resp.length], .{});
-
-            try install.install_release(alloc, &client, releases, &rel, cp);
-        },
-        Cli.remove => |version| {
-            const rel = try Release.releasefromVersion(version);
-            try remove_release(alloc, rel, cp);
-        },
-        Cli.show => try show_info(alloc, cp),
-        Cli.std => |ver| try open_std(alloc, cp, ver),
-        Cli.reference => |ver| try open_reference(alloc, cp, ver),
-        Cli.override => |oa| {
-            var override_args = oa;
-            const rel = try Release.releasefromVersion(override_args.version);
-            if (override_args.directory != null and !streql(override_args.directory.?, "default")) {
-                override_args.directory = try std.fs.realpathAlloc(alloc, override_args.directory.?);
-            }
-            const directory = override_args.directory orelse try std.process.getCwdAlloc(alloc);
-            try override(alloc, cp, rel, directory);
-        },
-        Cli.override_rm => |dir| {
-            const directory = dir orelse try std.process.getCwdAlloc(alloc);
-            try override_rm(alloc, cp, directory);
-        },
-        Cli.update_self => try update_self.update_self(alloc, cp),
-        Cli.update => |version_possible| try update_zig_installation(alloc, cp, version_possible),
-    }
+    // switch (command) {
+    //     Cli.install => |version| {
+    //         var rel = try Release.releasefromVersion(version);
+    //         if (cp.install_dir.openDir(try common.release_name(alloc, rel), .{})) |_| {
+    //             std.log.err("Version already installled. Quitting", .{});
+    //             std.process.exit(0);
+    //         } else |_| {}
+    //
+    //         var client = Client{ .allocator = alloc };
+    //         defer client.deinit();
+    //
+    //         const resp = try install.get_json_dslist(&client);
+    //         const releases = try json.parseFromSliceLeaky(json.Value, alloc, resp.body[0..resp.length], .{});
+    //
+    //         try install.install_release(alloc, &client, releases, &rel, cp);
+    //     },
+    //     Cli.remove => |version| {
+    //         const rel = try Release.releasefromVersion(version);
+    //         try remove_release(alloc, rel, cp);
+    //     },
+    //     Cli.show => try show_info(alloc, cp),
+    //     Cli.std => |ver| try open_std(alloc, cp, ver),
+    //     Cli.reference => |ver| try open_reference(alloc, cp, ver),
+    //     Cli.override => |oa| {
+    //         var override_args = oa;
+    //         const rel = try Release.releasefromVersion(override_args.version);
+    //         if (override_args.directory != null and !streql(override_args.directory.?, "default")) {
+    //             override_args.directory = try std.fs.realpathAlloc(alloc, override_args.directory.?);
+    //         }
+    //         const directory = override_args.directory orelse try std.process.getCwdAlloc(alloc);
+    //         try override(alloc, cp, rel, directory);
+    //     },
+    //     Cli.override_rm => |dir| {
+    //         const directory = dir orelse try std.process.getCwdAlloc(alloc);
+    //         try override_rm(alloc, cp, directory);
+    //     },
+    //     Cli.update_self => try update_self.update_self(alloc, cp),
+    //     Cli.update => |version_possible| try update_zig_installation(alloc, cp, version_possible),
+    // }
 }
 
 fn remove_release(alloc: Allocator, rel: Release, cp: CommonPaths) !void {
