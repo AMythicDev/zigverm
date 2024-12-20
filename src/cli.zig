@@ -61,6 +61,7 @@ pub const Cli = CommandT{
             .vals = &.{
                 ValueT.ofType([]const u8, .{ .name = "version", .description = "Opens for this VERSION. If not specified, opens for the active Zig version in the current directory.", .default_val = "" }),
             },
+            .vals_mandatory = false,
         },
         .{
             .name = "reference",
@@ -68,6 +69,7 @@ pub const Cli = CommandT{
             .vals = &.{
                 ValueT.ofType([]const u8, .{ .name = "version", .description = "Opens for this VERSION. If not specified, opens for the active version on the current directory.", .default_val = "" }),
             },
+            .vals_mandatory = false,
         },
         .{
             .name = "info",
