@@ -2,32 +2,46 @@ const std = @import("std");
 const common = @import("common");
 const Allocator = std.mem.Allocator;
 
+const ExecError = error{VersionNotInstalled};
+
 pub fn main() !void {
     var aa = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     const alloc = aa.allocator();
 
+    var version: ?[]const u8 = null;
+    var version_specified = false;
+    var args_iter = try std.process.argsWithAllocator(alloc);
+    _ = args_iter.next();
+
+    const next_arg = args_iter.next();
+    if (next_arg) |arg| {
+        if (std.mem.startsWith(u8, arg, "@")) {
+            version = arg[1..];
+            version_specified = true;
+        }
+    }
+
     var cp = try common.paths.CommonPaths.resolve(alloc);
     defer cp.close();
 
-    const dir_to_check = try std.process.getCwdAlloc(alloc);
-
-    var overrides = try common.overrides.read_overrides(alloc, cp);
-    defer overrides.deinit();
-
-    const best_match = (try overrides.active_version(dir_to_check)).ver;
+    if (version == null) {
+        const dir_to_check = try std.process.getCwdAlloc(alloc);
+        var overrides = try common.overrides.read_overrides(alloc, cp);
+        defer overrides.deinit();
+        version = try alloc.dupe(u8, (try overrides.active_version(dir_to_check)).ver);
+    }
 
     const zig_path = try std.fs.path.join(alloc, &.{
         common.paths.CommonPaths.get_zigverm_root(),
         "installs/",
-        try common.release_name(alloc, try common.Release.releasefromVersion(best_match)),
+        try common.release_name(alloc, try common.Release.releasefromVersion(version.?)),
         "zig",
     });
 
     var executable = std.ArrayList([]const u8).init(alloc);
     try executable.append(zig_path);
 
-    var args_iter = try std.process.argsWithAllocator(alloc);
-    _ = args_iter.next();
+    if (!version_specified) if (next_arg) |arg| try executable.append(arg);
 
     while (args_iter.next()) |arg| {
         try executable.append(arg);
@@ -37,6 +51,6 @@ pub fn main() !void {
     child.stdin = std.io.getStdIn();
     child.stdout = std.io.getStdOut();
     child.stderr = std.io.getStdErr();
-    const term = try child.spawnAndWait();
+    const term = child.spawnAndWait() catch return ExecError.VersionNotInstalled;
     std.process.exit(term.Exited);
 }
