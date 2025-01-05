@@ -4,7 +4,7 @@ import sys
 import subprocess
 import os
 import zipfile
-
+import sys
 
 def make_release_tarballs():
     VERSION = None
@@ -46,6 +46,8 @@ def make_release_tarballs():
                 z.write("releases/"+target_dir+"/zigverm" +
                         exe_ext, target_dir+"/zigverm")
                 z.write("releases/"+target_dir+"/zig"+exe_ext, target_dir+"/zig")
+                z.write("LICENSE", target_dir+"/LICENSE")
+                z.write("README.md", target_dir+"/README")
     except subprocess.CalledProcessError as e:
         print("\n\n===========================================================")
         print(f"ERROR: Workgroup failed with exit code {e.returncode}")
@@ -57,6 +59,8 @@ def main():
 
     if args[1] == "make-release":
         make_release_tarballs()
+    else:
+        print(f"\x1b[33minvalid usage. No such subcommand '{args[1]}'", file=sys.stderr)
 
 
 if __name__ == "__main__":
