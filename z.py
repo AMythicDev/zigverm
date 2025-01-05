@@ -5,6 +5,7 @@ import subprocess
 import os
 import zipfile
 import sys
+from multiprocessing import Pool
 
 def make_release_tarballs():
     VERSION = None
@@ -12,7 +13,6 @@ def make_release_tarballs():
         process = subprocess.run(["zig", "build", "run-zigverm", "--", "--version" ], check=True, capture_output=True)
         VERSION = process.stdout.decode('utf-8').strip()
 
-    try:
         targets = [
             ["aarch64", "macos"],
             ["x86_64", "macos"],
@@ -25,33 +25,44 @@ def make_release_tarballs():
         if not os.path.exists("releases"):
             os.mkdir("releases")
 
-        for target in targets:
-            print(f"Building for {target}")
-            target_str = f"{target[0]}-{target[1]}"
-            target_dir = "zigverm-" + VERSION + "-" + target_str
-            subprocess.run(["zig", "build", "install", "--prefix", "releases/",
-                           "--prefix-exe-dir", target_dir, "--release=safe",
-                            f"-Dtarget={target_str}"], check=True)
-            subprocess.run(["zig", "build", "install", "--prefix", "releases/",
-                           "--prefix-exe-dir", target_dir, "--release=safe",
-                            f"-Dtarget={target_str}"], check=True)
+        with Pool(processes=len(targets)) as pool:
+            for target in targets:
+                pool.apply_async(make_target_release, [target, VERSION])
 
-            with zipfile.ZipFile("releases/"+target_dir+".zip", "w") as z:
-                z.write("releases/"+target_dir, target_dir);
-                if target[1] == "windows":
-                    exe_ext = ".exe"
-                else:
-                    exe_ext = ""
+            pool.close()
+            pool.join()
 
-                z.write("releases/"+target_dir+"/zigverm" +
-                        exe_ext, target_dir+"/zigverm")
-                z.write("releases/"+target_dir+"/zig"+exe_ext, target_dir+"/zig")
-                z.write("LICENSE", target_dir+"/LICENSE")
-                z.write("README.md", target_dir+"/README")
+def make_target_release(target: str, version: str):
+    try:
+        print(f"Building for {target}")
+        target_str = f"{target[0]}-{target[1]}"
+        target_dir = "zigverm-" + version + "-" + target_str
+        subprocess.run(["zig", "build", "install", "--prefix", "releases/",
+                       "--prefix-exe-dir", target_dir, "--release=safe",
+                        f"-Dtarget={target_str}"], check=True, stderr=subprocess.DEVNULL)
+        subprocess.run(["zig", "build", "install", "--prefix", "releases/",
+                       "--prefix-exe-dir", target_dir, "--release=safe",
+                        f"-Dtarget={target_str}"], check=True, stderr=subprocess.DEVNULL)
+
+        with zipfile.ZipFile("releases/"+target_dir+".zip", "w") as z:
+            z.write("releases/"+target_dir, target_dir);
+            if target[1] == "windows":
+                exe_ext = ".exe"
+            else:
+                exe_ext = ""
+
+            z.write("releases/"+target_dir+"/zigverm" +
+                    exe_ext, target_dir+"/zigverm")
+            z.write("releases/"+target_dir+"/zig"+exe_ext, target_dir+"/zig")
+            z.write("LICENSE", target_dir+"/LICENSE")
+            z.write("README.md", target_dir+"/README")
     except subprocess.CalledProcessError as e:
-        print("\n\n===========================================================")
-        print(f"ERROR: Workgroup failed with exit code {e.returncode}")
-        print("===========================================================")
+        eprint("\n\n=====================================================================================================")
+        eprint(f"ERROR: Build failed for target '{target}' with exit code {e.returncode}")
+        eprint("=========================================================================================================")
+
+def eprint(text: str):
+    print(f"\x1b[33m{text}", file=sys.stderr)
 
 
 def main():
@@ -60,7 +71,7 @@ def main():
     if args[1] == "make-release":
         make_release_tarballs()
     else:
-        print(f"\x1b[33minvalid usage. No such subcommand '{args[1]}'", file=sys.stderr)
+        eprint(f"invalid usage. No such subcommand '{args[1]}'")
 
 
 if __name__ == "__main__":
