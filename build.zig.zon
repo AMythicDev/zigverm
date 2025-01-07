@@ -8,6 +8,10 @@
             .url = "https://github.com/AMythicDev/zip.zig/archive/refs/tags/v0.1.0.tar.gz",
             .hash = "1220b5e3ecda108ccae1749479ec7e02f1f2ddcbb8102a2b5a7cd92bc8aebb4d153d",
         },
+        .cova = .{
+            .url = "https://github.com/00JCIV00/cova/archive/refs/tags/v0.10.1-beta.tar.gz",
+            .hash = "12202782cc66e88f0c15b9acea9d6d1d50dbe941d68b5297927243f6d0377dbb1123",
+        },
     },
 
     .paths = .{
