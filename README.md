@@ -52,7 +52,7 @@ shell supported is listed below:
 
 - Download the latest release for Windows from GitHub and extract it.
 - Copy `zigverm.exe` and `zig.exe` to the `bin/` folder.
-- Ass the `bin` directory to your `PATH` enviroment variable
+- Add the `bin` directory to your `PATH` enviroment variable
 
 ### Compiling
 
