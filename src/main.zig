@@ -29,7 +29,7 @@ pub fn main() !void {
 
     switch (command) {
         Cli.install => |version| {
-            var rel = try Release.releasefromVersion(version);
+            var rel = try Release.releaseFromVersion(version);
             if (cp.install_dir.openDir(try common.release_name(alloc, rel), .{})) |_| {
                 std.log.err("Version already installled. Quitting", .{});
                 std.process.exit(0);
@@ -44,7 +44,7 @@ pub fn main() !void {
             try install.install_release(alloc, &client, releases, &rel, cp);
         },
         Cli.remove => |version| {
-            const rel = try Release.releasefromVersion(version);
+            const rel = try Release.releaseFromVersion(version);
             try remove_release(alloc, rel, cp);
         },
         Cli.show => try show_info(alloc, cp),
@@ -52,7 +52,7 @@ pub fn main() !void {
         Cli.reference => |ver| try open_reference(alloc, cp, ver),
         Cli.override => |oa| {
             var override_args = oa;
-            const rel = try Release.releasefromVersion(override_args.version);
+            const rel = try Release.releaseFromVersion(override_args.version);
             if (override_args.directory != null and !streql(override_args.directory.?, "default")) {
                 override_args.directory = try std.fs.realpathAlloc(alloc, override_args.directory.?);
             }
@@ -94,7 +94,7 @@ fn open_std(alloc: Allocator, cp: CommonPaths, ver: ?[]const u8) !void {
     const zig_path = try std.fs.path.join(alloc, &.{
         common.paths.CommonPaths.get_zigverm_root(),
         "installs/",
-        try common.release_name(alloc, try common.Release.releasefromVersion(best_match)),
+        try common.release_name(alloc, try common.Release.releaseFromVersion(best_match)),
         "zig",
     });
 
@@ -121,7 +121,7 @@ fn open_reference(alloc: Allocator, cp: CommonPaths, ver: ?[]const u8) !void {
     const langref_path = try std.fs.path.join(alloc, &.{
         common.paths.CommonPaths.get_zigverm_root(),
         "installs/",
-        try common.release_name(alloc, try common.Release.releasefromVersion(best_match)),
+        try common.release_name(alloc, try common.Release.releaseFromVersion(best_match)),
         "doc",
         "langref.html",
     });
@@ -241,7 +241,7 @@ fn update_zig_installation(alloc: Allocator, cp: CommonPaths, version_possible: 
     const releases = try json.parseFromSliceLeaky(json.Value, alloc, resp.body[0..resp.length], .{});
 
     for (versions) |v| {
-        var rel = try Release.releasefromVersion(v);
+        var rel = try Release.releaseFromVersion(v);
         const release_name = try common.release_name(alloc, rel);
         if (cp.install_dir.openDir(release_name, .{})) |_| {
             var to_update = false;
@@ -249,14 +249,14 @@ fn update_zig_installation(alloc: Allocator, cp: CommonPaths, version_possible: 
                 to_update = false;
             } else if (rel.spec == common.ReleaseSpec.Master) {
                 const zig_version = try std.SemanticVersion.parse((try get_version_from_exe(alloc, release_name)).items);
-                var next_master_release = try Release.releasefromVersion("master");
+                var next_master_release = try Release.releaseFromVersion("master");
                 try next_master_release.resolve(releases);
                 if (zig_version.order(next_master_release.actual_version.?) != std.math.Order.eq) {
                     to_update = false;
                 }
             } else if (rel.spec == common.ReleaseSpec.Stable) {
                 const zig_version = try std.SemanticVersion.parse((try get_version_from_exe(alloc, release_name)).items);
-                var next_stable_release = try Release.releasefromVersion("stable");
+                var next_stable_release = try Release.releaseFromVersion("stable");
                 try next_stable_release.resolve(releases);
 
                 if (next_stable_release.actual_version.?.order(zig_version) == std.math.Order.gt) {

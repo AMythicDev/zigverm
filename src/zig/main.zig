@@ -34,7 +34,7 @@ pub fn main() !void {
     const zig_path = try std.fs.path.join(alloc, &.{
         common.paths.CommonPaths.get_zigverm_root(),
         "installs/",
-        try common.release_name(alloc, try common.Release.releasefromVersion(version.?)),
+        try common.release_name(alloc, try common.Release.releaseFromVersion(version.?)),
         "zig",
     });
 
