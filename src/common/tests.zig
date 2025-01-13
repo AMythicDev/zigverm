@@ -18,6 +18,7 @@ fn make_mock_releases(alloc: Allocator) !std.StringArrayHashMap(json.Value) {
     _ = try releases_map.fetchPut("0.10.1", .null);
     _ = try releases_map.fetchPut("0.11.0", .null);
     _ = try releases_map.fetchPut("0.12.0", .null);
+    _ = try releases_map.fetchPut("0.13.0", .null);
     _ = try releases_map.fetchPut("master", .null);
 
     return releases_map;
@@ -45,7 +46,7 @@ test "Resolve patch version with no patch releases" {
     defer releases_map.deinit();
     const releases = json.Value{ .object = releases_map };
 
-    var rel = try Release.releasefromVersion("0.12");
+    var rel = try Release.releaseFromVersion("0.12");
     try rel.resolve(releases);
 
     const v = try rel.actualVersion(alloc);
@@ -60,7 +61,7 @@ test "Resolve patch version with patch releases" {
     defer releases_map.deinit();
     const releases = json.Value{ .object = releases_map };
 
-    var rel = try Release.releasefromVersion("0.10");
+    var rel = try Release.releaseFromVersion("0.10");
     try rel.resolve(releases);
 
     const v = try rel.actualVersion(alloc);
@@ -75,10 +76,10 @@ test "Resolve stable" {
     defer releases_map.deinit();
     const releases = json.Value{ .object = releases_map };
 
-    var rel = try Release.releasefromVersion("stable");
+    var rel = try Release.releaseFromVersion("stable");
     try rel.resolve(releases);
 
     const v = try rel.actualVersion(alloc);
     defer alloc.free(v);
-    try std.testing.expectEqualStrings("0.12.0", v);
+    try std.testing.expectEqualStrings("0.13.0", v);
 }

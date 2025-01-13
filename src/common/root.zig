@@ -75,7 +75,7 @@ pub const Release = struct {
         }
     }
 
-    pub fn releasefromVersion(v: []const u8) RelError!Self {
+    pub fn releaseFromVersion(v: []const u8) RelError!Self {
         var rel: Release = undefined;
         if (streql(v, "master"))
             rel = Self{ .spec = .Master }
@@ -113,16 +113,12 @@ pub fn target_name() []const u8 {
     return @tagName(default_arch) ++ "-" ++ @tagName(default_os);
 }
 
-pub fn streql(cmd: []const u8, key: []const u8) bool {
-    return std.mem.eql(u8, cmd, key);
+pub fn streql(lhs: []const u8, rhs: []const u8) bool {
+    return std.mem.eql(u8, lhs, rhs);
 }
 
 pub fn release_name(alloc: Allocator, rel: Release) ![]const u8 {
     const release_string = rel.releaseName();
     const dw_target = comptime target_name();
     return try std.mem.concat(alloc, u8, &[_][]const u8{ "zig-" ++ dw_target ++ "-", release_string });
-}
-
-test {
-    std.testing.refAllDecls(@This());
 }

@@ -90,7 +90,7 @@ pub fn write_overrides(overrides: OverrideMap, cp: CommonPaths) !void {
     try cp.overrides.setEndPos(0);
     var file_writer = std.io.bufferedWriter(cp.overrides.writer());
 
-    try json.stringify(json.Value{ .object = overrides.backing_map }, .{ .whitespace = .indent_4 }, file_writer.writer());
+    try json.stringify(json.Value{ .object = overrides.backing_map }, .{ .whitespace = .indent_2 }, file_writer.writer());
     _ = try file_writer.write("\n");
     try file_writer.flush();
 }

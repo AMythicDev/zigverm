@@ -74,7 +74,7 @@ fn addTestRunner(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.
     const run_zig_tests = b.addRunArtifact(zig_tests);
 
     const common_tests = b.addTest(.{
-        .root_source_file = b.path("src/common/root.zig"),
+        .root_source_file = b.path("src/common/tests.zig"),
         .target = target,
         .optimize = optimize,
     });
