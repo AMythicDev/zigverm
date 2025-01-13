@@ -1,0 +1,6 @@
+[book]
+authors = ["Arijit Dey"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Zigverm"
