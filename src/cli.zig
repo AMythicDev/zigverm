@@ -3,7 +3,9 @@ const Allocator = std.mem.Allocator;
 const streql = @import("common").streql;
 const Version = @import("main.zig").Version;
 const utils = @import("utils.zig");
-
+const message_for_empty_args =
+    \\Refer below for zigverm usage. 
+;
 const helptext =
     \\zigverm - A version manager for Zig
     \\
@@ -66,8 +68,10 @@ pub const Cli = union(enum) {
             const trycmd = arg_iter.next();
             if (trycmd) |c|
                 cmd = c
-            else
-                incorrectUsage(null);
+            else {
+                utils.printStdOut("{s}\n\n{s}\n", .{ message_for_empty_args, helptext });
+                std.process.exit(0);
+            }
         }
 
         if (streql(cmd, "install")) {
