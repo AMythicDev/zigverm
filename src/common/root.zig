@@ -4,17 +4,12 @@ pub const overrides = @import("overrides.zig");
 const Allocator = std.mem.Allocator;
 const json = std.json;
 const builtin = @import("builtin");
-
+const MachVersion = @import("mach.zig").MachVersion;
+const RelError = @import("error.zig").RelError;
 pub const default_os = builtin.target.os.tag;
 pub const default_arch = builtin.target.cpu.arch;
 
-const RelError = error{
-    InvalidVersionSpec,
-    Overflow,
-    OutOfMemory,
-};
-
-pub const ReleaseSpec = union(enum) { Master, Stable, MajorMinorVersionSpec: []const u8, FullVersionSpec: []const u8 };
+pub const ReleaseSpec = union(enum) { Master, Stable, MajorMinorVersionSpec: []const u8, FullVersionSpec: []const u8, MachVersion: MachVersion };
 
 pub const Release = struct {
     spec: ReleaseSpec,
