@@ -10,7 +10,7 @@ pub const MachVersion = union(enum) {
     const mach_latest_prefix = "mach-latest";
     const mach_suffix = "-mach";
 
-    fn parse_str(version: []const u8) RelError!Self {
+    pub fn parse_str(version: []const u8) RelError!Self {
         if (std.mem.eql(u8, version, mach_latest_prefix)) return Self.latest;
 
         if (!std.mem.endsWith(u8, version, mach_suffix)) return RelError.InvalidVersionSpec;

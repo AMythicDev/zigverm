@@ -71,24 +71,19 @@ pub const Release = struct {
     }
 
     pub fn releaseFromVersion(v: []const u8) RelError!Self {
-        var rel: Release = undefined;
-        if (streql(v, "master"))
-            rel = Self{ .spec = .Master }
-        else if (streql(v, "stable"))
-            rel = Self{ .spec = .Stable }
-        else b: {
-            const count = std.mem.count(u8, v, ".");
-            if (count == 2) {
-                rel = Self{ .spec = ReleaseSpec{ .FullVersionSpec = v }, .actual_version = std.SemanticVersion.parse(v) catch return RelError.InvalidVersionSpec };
-                break :b;
-            }
-
-            const is_valid_version = completeSpec(v);
-            if (is_valid_version) |_| {
-                rel = Self{ .spec = ReleaseSpec{ .MajorMinorVersionSpec = v } };
-            } else |_| _ = try is_valid_version;
+        if (streql(v, "master")) return Self{ .spec = .Master };
+        if (streql(v, "stable")) return Self{ .spec = .Stable };
+        if (MachVersion.parse_str(v)) |mach| {
+            return Self{ .spec = ReleaseSpec{ .MachVersion = mach } };
+        } else |_| {}
+        const count = std.mem.count(u8, v, ".");
+        if (count == 2) {
+            return Self{ .spec = ReleaseSpec{ .FullVersionSpec = v }, .actual_version = std.SemanticVersion.parse(v) catch return RelError.InvalidVersionSpec };
         }
-        return rel;
+        if (completeSpec(v)) |_| {
+            return Self{ .spec = ReleaseSpec{ .MajorMinorVersionSpec = v } };
+        } else |_| {}
+        return RelError.InvalidVersionSpec;
     }
 
     pub inline fn completeSpec(spec: []const u8) RelError!std.SemanticVersion {
