@@ -203,7 +203,11 @@ fn override_rm(alloc: Allocator, cp: CommonPaths, directory: []const u8) !void {
     if (directory.len == 0) {
         actual_dir = try std.process.getCwdAlloc(alloc);
     } else {
-        actual_dir = try std.fs.realpathAlloc(alloc, directory);
+        if (std.mem.eql(u8, directory, "default")) {
+            actual_dir = directory;
+        } else {
+            actual_dir = try std.fs.realpathAlloc(alloc, directory);
+        }
     }
     _ = overrides.backing_map.orderedRemove(directory);
     try common.overrides.write_overrides(overrides, cp);
