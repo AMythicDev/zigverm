@@ -182,7 +182,11 @@ fn override(alloc: Allocator, cp: CommonPaths, rel: Release, directory: []const 
     if (directory.len == 0) {
         actual_dir = try std.process.getCwdAlloc(alloc);
     } else {
-        actual_dir = try std.fs.realpathAlloc(alloc, directory);
+        if (std.mem.eql(u8, directory, "default")) {
+            actual_dir = directory;
+        } else {
+            actual_dir = try std.fs.realpathAlloc(alloc, directory);
+        }
     }
     try overrides.addOverride(actual_dir, rel.releaseName());
     try common.overrides.write_overrides(overrides, cp);
