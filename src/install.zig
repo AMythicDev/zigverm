@@ -6,6 +6,7 @@ const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 const Client = std.http.Client;
 const json = std.json;
+const ReleaseSpec = common.ReleaseSpec;
 const Release = common.Release;
 const paths = common.paths;
 const CommonPaths = paths.CommonPaths;
@@ -18,7 +19,7 @@ const time = std.time;
 const default_os = builtin.target.os.tag;
 const default_arch = builtin.target.cpu.arch;
 
-const JsonResponse = struct {
+pub const JsonResponse = struct {
     body: [100 * 1024]u8,
     length: usize,
 };
@@ -31,10 +32,15 @@ const InstallError = error{
 
 pub fn install_release(alloc: Allocator, client: *Client, releases: json.Value, rel: *Release, cp: CommonPaths) !void {
     try rel.resolve(releases);
-
-    const release: json.Value = releases.object.get(try rel.actualVersion(alloc)).?;
+    var tarball_identifier: []const u8 = undefined;
+    if (rel.spec == .MachVersion) {
+        tarball_identifier = "zigTarball";
+    } else {
+        tarball_identifier = "tarball";
+    }
+    const release: json.Value = releases.object.get(try rel.actualVersion(alloc)) orelse return InstallError.ReleaseNotFound;
     const target = release.object.get(target_name()) orelse return InstallError.TargetNotAvailable;
-    const tarball_url = target.object.get("tarball").?.string;
+    const tarball_url = target.object.get(tarball_identifier).?.string;
     const shasum = target.object.get("shasum").?.string[0..64];
     const total_size = try std.fmt.parseInt(usize, target.object.get("size").?.string, 10);
 
@@ -162,14 +168,23 @@ pub fn download_progress_bar(dlnow: *std.atomic.Value(f32), tarball_size: f64, t
     try stderr_writer.print("\n", .{});
 }
 
-pub fn get_json_dslist(client: *Client) anyerror!JsonResponse {
-    std.log.info("Fetching the latest index", .{});
-    const uri = try std.Uri.parse("https://ziglang.org/download/index.json");
+pub fn get_index_data(client: *Client, release: Release, allocator: std.mem.Allocator) anyerror!std.json.Value {
+    const resp = try get_json_dslist(client, release);
+    return try json.parseFromSliceLeaky(json.Value, allocator, resp.body[0..resp.length], .{});
+}
 
+pub fn get_json_dslist(client: *Client, release: Release) anyerror!JsonResponse {
+    std.log.info("Fetching the latest index", .{});
+
+    const url: []const u8 = switch (release.spec) {
+        ReleaseSpec.MachVersion => "https://machengine.org/zig/index.json",
+        else => "https://ziglang.org/download/index.json",
+    };
+    const uri = try std.Uri.parse(url);
     var req = make_request(client, uri);
     defer req.?.deinit();
     if (req == null) {
-        std.log.err("Failed fetching the index. Exitting (1)...", .{});
+        std.log.err("Failed fetching the index from url: {s}. Exitting (1)...", .{url});
         std.process.exit(1);
     }
 

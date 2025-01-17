@@ -4,8 +4,9 @@ pub const overrides = @import("overrides.zig");
 const Allocator = std.mem.Allocator;
 const json = std.json;
 const builtin = @import("builtin");
-const MachVersion = @import("mach.zig").MachVersion;
+pub const MachVersion = @import("mach.zig").MachVersion;
 const RelError = @import("error.zig").RelError;
+pub const Cache = @import("cache.zig").Cache;
 pub const default_os = builtin.target.os.tag;
 pub const default_arch = builtin.target.cpu.arch;
 
@@ -21,12 +22,15 @@ pub const Release = struct {
         switch (self.spec) {
             ReleaseSpec.Master => return try alloc.dupe(u8, "master"),
             ReleaseSpec.FullVersionSpec => |v| return try alloc.dupe(u8, v),
+            ReleaseSpec.MachVersion => return try alloc.dupe(u8, self.releaseName()),
             else => {
-                if (self.actual_version == null) @panic("actual_version() called without resolving");
-                var buffer = std.ArrayList(u8).init(alloc);
-                defer buffer.deinit();
-                try self.actual_version.?.format("", .{}, buffer.writer());
-                return try alloc.dupe(u8, buffer.items);
+                if (self.actual_version) |actual_version| {
+                    var buffer = std.ArrayList(u8).init(alloc);
+                    defer buffer.deinit();
+                    try actual_version.format("", .{}, buffer.writer());
+                    return try alloc.dupe(u8, buffer.items);
+                }
+                @panic("actual_version() called without resolving");
             },
         }
     }
@@ -37,6 +41,13 @@ pub const Release = struct {
             ReleaseSpec.MajorMinorVersionSpec => |v| return v,
             ReleaseSpec.FullVersionSpec => |v| return v,
             ReleaseSpec.Stable => return "stable",
+            ReleaseSpec.MachVersion => |v| {
+                return switch (v) {
+                    MachVersion.latest => "mach-latest",
+                    MachVersion.calver => |mach_v| return mach_v,
+                    MachVersion.semantic => |mach_v| return mach_v,
+                };
+            },
         }
     }
 
@@ -44,6 +55,9 @@ pub const Release = struct {
         if (self.spec == ReleaseSpec.FullVersionSpec) return;
         if (self.spec == ReleaseSpec.Master) {
             self.actual_version = std.SemanticVersion.parse(releases.object.get("master").?.object.get("version").?.string) catch unreachable;
+            return;
+        }
+        if (self.spec == .MachVersion) {
             return;
         }
 
