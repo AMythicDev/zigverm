@@ -18,8 +18,22 @@ const install = @import("install.zig");
 
 pub const Version = "0.6.0";
 
+fn index_install_args(args: anytype) u64 {
+    const release: Release = args[1];
+    if (release.spec == .MachVersion) {
+        return 1;
+    } else {
+        return 2;
+    }
+}
+var BUFFER: [1024 * 1024]u8 = undefined;
+var buffered_allocator = std.heap.FixedBufferAllocator.init(&BUFFER);
+const buffer_allocator = buffered_allocator.allocator();
+const CacheIndexData = common.Cache(install.get_index_data, index_install_args);
+var cache = CacheIndexData.init(buffer_allocator);
 pub fn main() !void {
     var aa = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer aa.deinit();
     const alloc = aa.allocator();
 
     const command = try Cli.read_args(alloc);
@@ -31,15 +45,14 @@ pub fn main() !void {
         Cli.install => |version| {
             var rel = try Release.releaseFromVersion(version);
             if (cp.install_dir.openDir(try common.release_name(alloc, rel), .{})) |_| {
-                std.log.err("Version already installled. Quitting", .{});
+                std.log.info("Version: {s} already installled. Quitting", .{try rel.actualVersion(alloc)});
                 std.process.exit(0);
             } else |_| {}
 
             var client = Client{ .allocator = alloc };
             defer client.deinit();
 
-            const resp = try install.get_json_dslist(&client);
-            const releases = try json.parseFromSliceLeaky(json.Value, alloc, resp.body[0..resp.length], .{});
+            _, const releases: std.json.Value = try cache.get(.{ &client, rel, alloc });
 
             try install.install_release(alloc, &client, releases, &rel, cp);
         },
@@ -169,7 +182,11 @@ fn override(alloc: Allocator, cp: CommonPaths, rel: Release, directory: []const 
     if (directory.len == 0) {
         actual_dir = try std.process.getCwdAlloc(alloc);
     } else {
-        actual_dir = try std.fs.realpathAlloc(alloc, directory);
+        if (std.mem.eql(u8, directory, "default")) {
+            actual_dir = directory;
+        } else {
+            actual_dir = try std.fs.realpathAlloc(alloc, directory);
+        }
     }
     try overrides.addOverride(actual_dir, rel.releaseName());
     try common.overrides.write_overrides(overrides, cp);
@@ -186,7 +203,11 @@ fn override_rm(alloc: Allocator, cp: CommonPaths, directory: []const u8) !void {
     if (directory.len == 0) {
         actual_dir = try std.process.getCwdAlloc(alloc);
     } else {
-        actual_dir = try std.fs.realpathAlloc(alloc, directory);
+        if (std.mem.eql(u8, directory, "default")) {
+            actual_dir = directory;
+        } else {
+            actual_dir = try std.fs.realpathAlloc(alloc, directory);
+        }
     }
     _ = overrides.backing_map.orderedRemove(directory);
     try common.overrides.write_overrides(overrides, cp);
@@ -237,11 +258,11 @@ fn update_zig_installation(alloc: Allocator, cp: CommonPaths, version_possible: 
     var already_update = std.ArrayList([]const u8).init(alloc);
     var client = Client{ .allocator = alloc };
     defer client.deinit();
-    const resp = try install.get_json_dslist(&client);
-    const releases = try json.parseFromSliceLeaky(json.Value, alloc, resp.body[0..resp.length], .{});
 
     for (versions) |v| {
         var rel = try Release.releaseFromVersion(v);
+        _, const releases: std.json.Value = try cache.get(.{ &client, rel, alloc });
+
         const release_name = try common.release_name(alloc, rel);
         if (cp.install_dir.openDir(release_name, .{})) |_| {
             var to_update = false;
