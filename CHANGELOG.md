@@ -2,6 +2,21 @@
 
 This file documents all changes made to the project and is updated before each release.
 
+## v0.6.0 [2025-01-25]
+### Added
+- The LICENSE and README file will now be included with each release.
+- Override the zig version for a specific command by writing `zig @<version> ...`
+- Use `multiprocessing` module in `z.py` to build parallel releases
+
+### Changed
+- `zigverm override-rm` requires the directory path to be explicit given.
+- `zigverm override`/`zigverm override-rm` can now take relative directory paths.
+- Overhaul the download progress bar
+
+### Fixed
+- Tests not being run from `common/tests.zig` file
+- `master` versions not being updated to `to_update` being set to false;
+
 ## v0.5.1 [2024-11-29]
 
 ### Fixed

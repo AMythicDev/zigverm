@@ -64,7 +64,6 @@ def make_target_release(target: str, version: str):
 def eprint(text: str):
     print(f"\x1b[33m{text}", file=sys.stderr)
 
-
 def main():
     args = sys.argv
 
