@@ -252,7 +252,7 @@ fn update_zig_installation(alloc: Allocator, cp: CommonPaths, version_possible: 
                 var next_master_release = try Release.releaseFromVersion("master");
                 try next_master_release.resolve(releases);
                 if (zig_version.order(next_master_release.actual_version.?) != std.math.Order.eq) {
-                    to_update = false;
+                    to_update = true;
                 }
             } else if (rel.spec == common.ReleaseSpec.Stable) {
                 const zig_version = try std.SemanticVersion.parse((try get_version_from_exe(alloc, release_name)).items);
