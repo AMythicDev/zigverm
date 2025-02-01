@@ -2,9 +2,10 @@
 
 This file documents all changes made to the project and is updated before each release.
 
-## v0.6.1 [2025-01-25]
+## v0.6.1 [2025-02-01]
 ### Fixed
 - Fix download progress bar stuck at 99%
+- Fix override command not recognizing `default` as a keyword
 
 ## v0.6.0 [2025-01-25]
 ### Added
