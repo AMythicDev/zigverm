@@ -121,10 +121,11 @@ pub fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, t
 
     // Convert everything into f64 for less typing in calculating % download and download speed
     var dlnow = std.atomic.Value(f32).init(0);
-    const total_size_double: f64 = @floatFromInt(total_size);
+    const total_size_d: f64 = @floatFromInt(total_size);
+    const tarball_size_d: f64 = @floatFromInt(tarball_size);
 
-    const progress_thread = try std.Thread.spawn(.{}, download_progress_bar, .{ &dlnow, @as(f64, @floatFromInt(tarball_size)), total_size_double });
-    while (true) {
+    const progress_thread = try std.Thread.spawn(.{}, download_progress_bar, .{ &dlnow, tarball_size_d, total_size_d });
+    while (tarball_size_d + dlnow.load(AtomicOrder.monotonic) <= total_size_d) {
         const len = try reader.read(&buff);
         if (len == 0) {
             break;
@@ -154,7 +155,7 @@ pub fn download_progress_bar(dlnow: *std.atomic.Value(f32), tarball_size: f64, t
         const speed = downloaded / 1024 / @as(f64, @floatFromInt(timer.read() / time.ns_per_s));
         try stderr_writer.print("\x1b[G\x1b[0K\t\x1b[33m{s}\x1b[0m{s} {d}% {d:.1}KB/s", .{ progress_bar[0 .. newbars * 3], progress_bar[newbars * 3 ..], pcnt_complete, speed });
 
-        if (downloaded + tarball_size == total_size) break;
+        if (downloaded + tarball_size >= total_size) break;
 
         std.time.sleep(500 * time.ns_per_ms);
         downloaded = dlnow.load(AtomicOrder.monotonic);
