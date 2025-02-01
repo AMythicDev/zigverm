@@ -2,6 +2,10 @@
 
 This file documents all changes made to the project and is updated before each release.
 
+## v0.6.1 [2025-01-25]
+### Fixed
+- Fix download progress bar stuck at 99%
+
 ## v0.6.0 [2025-01-25]
 ### Added
 - The LICENSE and README file will now be included with each release.
