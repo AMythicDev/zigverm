@@ -166,11 +166,14 @@ fn override(alloc: Allocator, cp: CommonPaths, rel: Release, directory: []const 
     var overrides = try common.overrides.read_overrides(alloc, cp);
     defer overrides.deinit();
     var actual_dir: []const u8 = undefined;
-    if (directory.len == 0) {
-        actual_dir = try std.process.getCwdAlloc(alloc);
-    } else {
+
+    if (streql(directory, "default"))
+        actual_dir = try alloc.dupe(u8, "default")
+    else if (directory.len == 0)
+        actual_dir = try std.process.getCwdAlloc(alloc)
+    else
         actual_dir = try std.fs.realpathAlloc(alloc, directory);
-    }
+
     try overrides.addOverride(actual_dir, rel.releaseName());
     try common.overrides.write_overrides(overrides, cp);
 }
@@ -183,11 +186,13 @@ fn override_rm(alloc: Allocator, cp: CommonPaths, directory: []const u8) !void {
     var overrides = try common.overrides.read_overrides(alloc, cp);
     defer overrides.deinit();
     var actual_dir: []const u8 = undefined;
-    if (directory.len == 0) {
-        actual_dir = try std.process.getCwdAlloc(alloc);
-    } else {
+    if (streql(directory, "default"))
+        actual_dir = try alloc.dupe(u8, "default")
+    else if (directory.len == 0)
+        actual_dir = try std.process.getCwdAlloc(alloc)
+    else
         actual_dir = try std.fs.realpathAlloc(alloc, directory);
-    }
+
     _ = overrides.backing_map.orderedRemove(directory);
     try common.overrides.write_overrides(overrides, cp);
 }
