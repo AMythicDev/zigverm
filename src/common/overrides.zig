@@ -52,16 +52,15 @@ pub const OverrideMap = struct {
 
 pub fn read_overrides(alloc: Allocator, cp: CommonPaths) !OverrideMap {
     var file_bufreader = std.io.bufferedReader(cp.overrides.reader());
-    var file_reader = file_bufreader.reader();
-    var buff: [100]u8 = undefined;
+    const file_reader = file_bufreader.reader();
 
     var overrides = OverrideMap{ .backing_map = json.ObjectMap.init(alloc), .allocator = alloc };
 
     // HACK: Here we are ensuring that the overrides.json file isn't empty, otherwise the json parsing will return an
-    // error. Instead if the file is empty, we create ab enott StringArrayHashMap to hold our overrides.
+    // error. Instead if the file is empty, we create StringArrayHashMap to hold our overrides.
     // Typically we would prefer the pread() function but its currently broken for Windows, hence we do hacky method
     // by checking if there bytes can be read and then resetting the file cursor back to 0.
-    if (try file_reader.read(&buff) != 0) {
+    if (try cp.overrides.getEndPos() != 0) {
         try cp.overrides.seekTo(0);
         var json_reader = json.reader(alloc, file_reader);
         const parsed = try json.parseFromTokenSource(json.Value, alloc, &json_reader, .{});
