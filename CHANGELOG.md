@@ -2,6 +2,10 @@
 
 This file documents all changes made to the project and is updated before each release.
 
+## v0.6.2 [2025-02-04]
+### Fixed
+- JSON parser returns syntax error when parsing large overrides.json file
+
 ## v0.6.1 [2025-02-01]
 ### Fixed
 - Fix download progress bar stuck at 99%
