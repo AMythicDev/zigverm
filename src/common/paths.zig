@@ -76,7 +76,7 @@ pub fn home_dir(alloc: Allocator) ![]const u8 {
         } else |_| {
             switch (default_os) {
                 OsTag.linux, OsTag.openbsd => {
-                    return std.mem.span(std.c.getpwuid(getuid()).?.pw_dir.?);
+                    return std.mem.span(std.c.getpwuid(getuid()).?.dir.?);
                 },
                 else => {
                     @panic("Cannot determine home directory");
