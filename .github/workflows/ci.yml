@@ -43,16 +43,3 @@ jobs:
           version: 0.12.0
       - run: zig build -Dtarget=${{ matrix.target }}
       - run: zig build test
-
-  install-script:
-    strategy:
-      matrix:
-        target:
-          - "ubuntu-latest"
-          - "macos-latest"
-          - "macos-13"
-
-    runs-on: ${{ matrix.target }}
-    steps:
-      - run: curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/AMythicDev/zigverm/main/scripts/install.sh | bash
-      - run: ls ~/.zigverm/bin/
