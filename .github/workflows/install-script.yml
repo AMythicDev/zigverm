@@ -1,6 +1,11 @@
 name: ci
 on:
-  push: tags
+  push:
+    paths:
+      - "scripts/install.sh"
+    tags:
+      - "*"
+
 jobs:
   install-script:
     strategy:
