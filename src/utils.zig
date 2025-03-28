@@ -19,7 +19,7 @@ pub fn check_install_name(name: []const u8) bool {
     if (!std.mem.startsWith(u8, name, "zig-")) {
         return false;
     }
-    var components = std.mem.split(u8, name[4..], "-");
+    var components = std.mem.splitScalar(u8, name[4..], '-');
 
     const arch = components.next();
     const os = components.next();
@@ -36,14 +36,14 @@ pub fn check_install_name(name: []const u8) bool {
 }
 
 pub inline fn is_valid_arch_os(arch: ?[]const u8, os: ?[]const u8) bool {
-    const arch_fields = @typeInfo(std.Target.Cpu.Arch).Enum.fields;
+    const arch_fields = @typeInfo(std.Target.Cpu.Arch).@"enum".fields;
     comptime var archs: [arch_fields.len][]const u8 = undefined;
     comptime {
         for (arch_fields, 0..) |a, i| {
             archs[i] = a.name;
         }
     }
-    const osfields = @typeInfo(std.Target.Os.Tag).Enum.fields;
+    const osfields = @typeInfo(std.Target.Os.Tag).@"enum".fields;
     comptime var oses: [osfields.len][]const u8 = undefined;
     comptime {
         for (osfields, 0..) |o, i| {
