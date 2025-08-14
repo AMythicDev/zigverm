@@ -10,9 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: goto-bus-stop/setup-zig@v2
+      - uses: mlugg/setup-zig@v2
         with:
-          version: 0.12.0
+          version: "0.14.1"
       - run: zig fmt --check *.zig src/*.zig
 
   install-sh:
@@ -38,8 +38,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: mlugg/setup-zig@v1
+      - uses: mlugg/setup-zig@v2
         with:
-          version: 0.12.0
+          version: "0.14.1"
       - run: zig build -Dtarget=${{ matrix.target }}
       - run: zig build test

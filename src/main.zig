@@ -202,7 +202,7 @@ fn installed_versions(alloc: Allocator, cp: CommonPaths) ![][]const u8 {
     var versions = std.ArrayList([]const u8).init(alloc);
     while (try iter.next()) |i| {
         if (!utils.check_install_name(i.name)) continue;
-        var components = std.mem.split(u8, i.name[4..], "-");
+        var components = std.mem.splitScalar(u8, i.name[4..], '-');
         _ = components.next();
         _ = components.next();
         const version = components.next() orelse unreachable;
@@ -211,7 +211,7 @@ fn installed_versions(alloc: Allocator, cp: CommonPaths) ![][]const u8 {
     return versions.items;
 }
 
-fn get_version_from_exe(alloc: Allocator, release_name: []const u8) !std.ArrayList(u8) {
+fn get_version_from_exe(alloc: Allocator, release_name: []const u8) !std.ArrayListUnmanaged(u8) {
     var executable = [2][]const u8{ undefined, "version" };
     executable[0] = try std.fs.path.join(alloc, &.{
         common.paths.CommonPaths.get_zigverm_root(),
@@ -219,13 +219,13 @@ fn get_version_from_exe(alloc: Allocator, release_name: []const u8) !std.ArrayLi
         release_name,
         "zig",
     });
-    var version = std.ArrayList(u8).init(alloc);
-    var stderr = std.ArrayList(u8).init(alloc);
+    var version: std.ArrayListUnmanaged(u8) = .empty;
+    var stderr: std.ArrayListUnmanaged(u8) = .empty;
     var child = std.process.Child.init(&executable, alloc);
     child.stdout_behavior = .Pipe;
     child.stderr_behavior = .Pipe;
     try child.spawn();
-    try child.collectOutput(&version, &stderr, 256);
+    try child.collectOutput(alloc, &version, &stderr, 256);
     _ = try child.wait();
     _ = version.pop();
 
