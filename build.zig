@@ -21,12 +21,14 @@ pub fn build(b: *std.Build) !void {
             .strip = strip,
         }) },
     );
+    zigverm.subsystem = .Console;
     const zig = b.addExecutable(.{ .name = "zig", .root_module = b.createModule(.{
         .root_source_file = b.path("src/zig/main.zig"),
         .target = target,
         .optimize = optimize,
         .strip = strip,
     }) });
+    zig.subsystem = .Console;
 
     zigverm.root_module.addImport("common", common);
     // zigverm.root_module.addImport("zip", zip.module("zip"));
