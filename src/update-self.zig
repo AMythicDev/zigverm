@@ -12,7 +12,6 @@ const File = std.fs.File;
 const BufferedReader = std.io.BufferedReader;
 const BufferedWriter = std.io.BufferedWriter;
 const Allocator = std.mem.Allocator;
-const ZipArchive = @import("zip").read.ZipArchive;
 
 const DownloadTarball = struct {
     filename: []const u8,
@@ -72,20 +71,19 @@ pub fn update_self(alloc: Allocator, cp: CommonPaths) !void {
         try install.download_tarball(alloc, &client, download_tarball.url, &download_tarball.writer.?, download_tarball.file_size, download_tarball.actual_size);
     try download_tarball.file_handle.?.seekTo(0);
     const bin_dir = try cp.zigverm_root.openDir("bin/", .{});
+    _ = bin_dir;
 
-    const zipfile = try ZipArchive.openFromStreamSource(alloc, @constCast(&std.io.StreamSource{ .file = download_tarball.file_handle.? }));
+    var src = @constCast(&std.io.StreamSource{ .file = download_tarball.file_handle.? }).seekableStream();
+    var m_iter = try std.zip.Iterator(@TypeOf(&src)).init(&src);
 
-    var m_iter = zipfile.members.iterator();
-    while (m_iter.next()) |i| {
-        var entry = i.value_ptr.*;
-        if (entry.is_dir) continue;
-
-        const filename = std.fs.path.basename(i.key_ptr.*);
-        const file = try bin_dir.createFile(filename, .{ .truncate = true, .lock = .shared });
-        var file_writer = std.io.bufferedWriter(file.writer());
-        defer file.close();
-
-        _ = try entry.decompressWriter(&file_writer.writer());
+    while (try m_iter.next()) |i| {
+        std.debug.print("{any}", .{i});
+        // const filename = std.fs.path.basename(i.key_ptr.*);
+        // const file = try bin_dir.createFile(filename, .{ .truncate = true, .lock = .shared });
+        // var file_writer = std.io.bufferedWriter(file.writer());
+        // defer file.close();
+        //
+        // _ = try entry.decompressWriter(&file_writer.writer());
     }
     std.debug.print("zigverm updated successfully", .{});
 }

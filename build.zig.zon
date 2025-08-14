@@ -1,14 +1,8 @@
 .{
-    .name = "zigverm",
+    .name = .zigverm,
     .version = "0.6.2",
     .minimum_zig_version = "0.11.0",
-
-    .dependencies = .{
-        .zip = .{
-            .url = "git+https://github.com/AMythicDev/zip.zig#b1f8fe858943cb14eb333c7424bb23ae002ee7a1",
-            .hash = "1220130f0297f2c4cca318c6383758e5c1632467556147347af2c6a1214cab7a6ba4",
-        },
-    },
+    .fingerprint = 0xffdf55ceb1c7efde,
 
     .paths = .{
         "build.zig",
