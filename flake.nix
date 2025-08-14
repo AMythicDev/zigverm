@@ -9,7 +9,7 @@
         with import nixpkgs { inherit system; };
         stdenv.mkDerivation(finalAttrs: {
           name = "zigverm";
-          version = "0.6.2";
+          version = "0.7.0";
 
           src = fetchFromGitHub {
             owner = "AMythicDev";

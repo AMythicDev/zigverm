@@ -1,4 +1,4 @@
-name: ci
+name: autoinstall-script
 on:
   push:
     paths:
