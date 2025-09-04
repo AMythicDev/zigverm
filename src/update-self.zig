@@ -2,6 +2,7 @@ const std = @import("std");
 const common = @import("common");
 const install = @import("install.zig");
 const builtin = @import("builtin");
+const ZipArchive = @import("zip").read.ZipArchive;
 const streql = common.streql;
 
 const http = std.http;
@@ -9,8 +10,6 @@ const json = std.json;
 const CommonPaths = common.paths.CommonPaths;
 const Client = std.http.Client;
 const File = std.fs.File;
-const BufferedReader = std.io.BufferedReader;
-const BufferedWriter = std.io.BufferedWriter;
 const Allocator = std.mem.Allocator;
 
 const DownloadTarball = struct {
@@ -19,15 +18,17 @@ const DownloadTarball = struct {
     actual_size: usize,
 
     file_handle: ?std.fs.File = null,
-    writer: ?BufferedWriter(4096, std.fs.File.Writer) = null,
+    writer: ?std.fs.File.Writer = null,
     file_size: usize = 0,
+
+    var buf: [4096]u8 = undefined;
 
     const Self = @This();
 
     fn createDownloadFile(self: *Self, cp1: CommonPaths) !void {
         self.file_handle = try cp1.download_dir.createFile(self.filename, .{ .read = true, .truncate = false });
-        self.writer = std.io.bufferedWriter(self.file_handle.?.writer());
-        self.file_size = @intCast((try self.file_handle.?.metadata()).size());
+        self.writer = self.file_handle.?.writer(&buf);
+        self.file_size = @intCast(try self.file_handle.?.getEndPos());
     }
 
     fn deinit(self: *Self) !void {
@@ -71,19 +72,26 @@ pub fn update_self(alloc: Allocator, cp: CommonPaths) !void {
         try install.download_tarball(alloc, &client, download_tarball.url, &download_tarball.writer.?, download_tarball.file_size, download_tarball.actual_size);
     try download_tarball.file_handle.?.seekTo(0);
     const bin_dir = try cp.zigverm_root.openDir("bin/", .{});
-    _ = bin_dir;
 
-    var src = @constCast(&std.io.StreamSource{ .file = download_tarball.file_handle.? }).seekableStream();
-    var m_iter = try std.zip.Iterator(@TypeOf(&src)).init(&src);
+    var buf: [4096]u8 = undefined;
+    var src = File.Reader.init(download_tarball.file_handle.?, &buf);
 
-    while (try m_iter.next()) |i| {
-        std.debug.print("{any}", .{i});
-        // const filename = std.fs.path.basename(i.key_ptr.*);
-        // const file = try bin_dir.createFile(filename, .{ .truncate = true, .lock = .shared });
-        // var file_writer = std.io.bufferedWriter(file.writer());
-        // defer file.close();
-        //
-        // _ = try entry.decompressWriter(&file_writer.writer());
+    var zipfile = try ZipArchive.openFromFileReader(alloc, &src);
+    defer zipfile.close();
+
+    var m_iter = zipfile.members.iterator();
+    while (m_iter.next()) |i| {
+        var entry = i.value_ptr.*;
+        if (entry.is_dir) continue;
+
+        const filename = std.fs.path.basename(i.key_ptr.*);
+        const file = try bin_dir.createFile(filename, .{ .truncate = true, .lock = .shared });
+        var file_writer = file.writer(&buf);
+        const intf = &file_writer.interface;
+        // HACK: Fix this once zip.zig fixes its decompressWriter function signature.
+        defer file.close();
+
+        try entry.decompressWriter(intf);
     }
     std.debug.print("zigverm updated successfully", .{});
 }
@@ -98,8 +106,11 @@ fn read_github_releases_data(alloc: Allocator, client: *Client) !json.Parsed(jso
         std.process.exit(1);
     }
     req.?.extra_headers = &.{ http.Header{ .name = "Accept", .value = "application/vnd.github+json" }, http.Header{ .name = "X-GitHub-Api-Version", .value = "2022-11-28" } };
-    try req.?.send();
-    try req.?.wait();
-    var json_reader = json.reader(alloc, req.?.reader());
+    try req.?.sendBodiless();
+
+    var resp = try req.?.receiveHead(&.{});
+    const body = resp.reader(&.{});
+
+    var json_reader = json.Reader.init(alloc, body);
     return try json.parseFromTokenSource(json.Value, alloc, &json_reader, .{});
 }

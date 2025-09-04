@@ -3,6 +3,7 @@ const Allocator = std.mem.Allocator;
 const StringArrayHashMap = std.StringArrayHashMap;
 const json = std.json;
 const CommonPaths = @import("paths.zig").CommonPaths;
+const File = std.fs.File;
 
 pub const OverrideMap = struct {
     backing_map: json.ObjectMap,
@@ -51,8 +52,9 @@ pub const OverrideMap = struct {
 };
 
 pub fn read_overrides(alloc: Allocator, cp: CommonPaths) !OverrideMap {
-    var file_bufreader = std.io.bufferedReader(cp.overrides.reader());
-    const file_reader = file_bufreader.reader();
+    var buf: [4096]u8 = undefined;
+    var file_bufreader = File.Reader.init(cp.overrides, &buf);
+    const file_reader = &file_bufreader.interface;
 
     var overrides = OverrideMap{ .backing_map = json.ObjectMap.init(alloc), .allocator = alloc };
 
@@ -62,7 +64,7 @@ pub fn read_overrides(alloc: Allocator, cp: CommonPaths) !OverrideMap {
     // by checking if there bytes can be read and then resetting the file cursor back to 0.
     if (try cp.overrides.getEndPos() != 0) {
         try cp.overrides.seekTo(0);
-        var json_reader = json.reader(alloc, file_reader);
+        var json_reader = json.Reader.init(alloc, file_reader);
         const parsed = try json.parseFromTokenSource(json.Value, alloc, &json_reader, .{});
         defer {
             json_reader.deinit();
@@ -87,9 +89,11 @@ pub fn write_overrides(overrides: OverrideMap, cp: CommonPaths) !void {
     // isn't any weird byte writings at the beginning of the file.
     try cp.overrides.seekTo(0);
     try cp.overrides.setEndPos(0);
-    var file_writer = std.io.bufferedWriter(cp.overrides.writer());
+    var buf: [4096]u8 = undefined;
+    var file_writer = cp.overrides.writer(&buf);
+    const intf = &file_writer.interface;
 
-    try json.stringify(json.Value{ .object = overrides.backing_map }, .{ .whitespace = .indent_2 }, file_writer.writer());
-    _ = try file_writer.write("\n");
-    try file_writer.flush();
+    try json.Stringify.value(json.Value{ .object = overrides.backing_map }, .{ .whitespace = .indent_2 }, intf);
+    _ = try intf.write("\n");
+    try file_writer.end();
 }

@@ -12,6 +12,7 @@ const RelError = error{
     InvalidVersionSpec,
     Overflow,
     OutOfMemory,
+    WriteFailed,
 };
 
 pub const ReleaseSpec = union(enum) { Master, Stable, MajorMinorVersionSpec: []const u8, FullVersionSpec: []const u8 };
@@ -28,9 +29,11 @@ pub const Release = struct {
             ReleaseSpec.FullVersionSpec => |v| return try alloc.dupe(u8, v),
             else => {
                 if (self.actual_version == null) @panic("actual_version() called without resolving");
-                var buffer = std.ArrayList(u8).init(alloc);
-                defer buffer.deinit();
-                try self.actual_version.?.format("", .{}, buffer.writer());
+                var buffer: std.ArrayListUnmanaged(u8) = .empty;
+                defer buffer.deinit(alloc);
+                var writer = std.Io.Writer.Allocating.fromArrayList(alloc, &buffer);
+                const intf = &writer.writer;
+                try self.actual_version.?.format(intf);
                 return try alloc.dupe(u8, buffer.items);
             },
         }
@@ -98,13 +101,15 @@ pub const Release = struct {
 
     pub inline fn completeSpec(spec: []const u8) RelError!std.SemanticVersion {
         const count = std.mem.count(u8, spec, ".");
-        var buffer = try std.BoundedArray(u8, 24).fromSlice(spec);
+        var buf: [24]u8 = undefined;
+        var buffer = std.ArrayListUnmanaged(u8).initBuffer(&buf);
+        try buffer.appendSliceBounded(spec);
 
         if (count == 2)
             return std.SemanticVersion.parse(spec) catch return RelError.InvalidVersionSpec
         else if (count == 1) {
-            try buffer.appendSlice(".0");
-            return std.SemanticVersion.parse(buffer.slice()) catch return RelError.InvalidVersionSpec;
+            try buffer.appendSliceBounded(".0");
+            return std.SemanticVersion.parse(buffer.items) catch return RelError.InvalidVersionSpec;
         } else return RelError.InvalidVersionSpec;
     }
 };

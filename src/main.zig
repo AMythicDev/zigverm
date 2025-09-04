@@ -98,9 +98,9 @@ fn open_std(alloc: Allocator, cp: CommonPaths, ver: ?[]const u8) !void {
         "zig",
     });
 
-    var executable = std.ArrayList([]const u8).init(alloc);
-    try executable.append(zig_path);
-    try executable.append("std");
+    var executable: std.ArrayListUnmanaged([]const u8) = .empty;
+    try executable.append(alloc, zig_path);
+    try executable.append(alloc, "std");
     var child = std.process.Child.init(executable.items, alloc);
     const term = try child.spawnAndWait();
     std.process.exit(term.Exited);
@@ -132,9 +132,9 @@ fn open_reference(alloc: Allocator, cp: CommonPaths, ver: ?[]const u8) !void {
         else => "xdg-open",
     };
 
-    var executable = std.ArrayList([]const u8).init(alloc);
-    try executable.append(main_exe);
-    try executable.append(langref_path);
+    var executable: std.ArrayListUnmanaged([]const u8) = .empty;
+    try executable.append(alloc, main_exe);
+    try executable.append(alloc, langref_path);
     var child = std.process.Child.init(executable.items, alloc);
     try child.spawn();
 }
@@ -199,14 +199,14 @@ fn override_rm(alloc: Allocator, cp: CommonPaths, directory: []const u8) !void {
 
 fn installed_versions(alloc: Allocator, cp: CommonPaths) ![][]const u8 {
     var iter = cp.install_dir.iterate();
-    var versions = std.ArrayList([]const u8).init(alloc);
+    var versions: std.ArrayList([]const u8) = .empty;
     while (try iter.next()) |i| {
         if (!utils.check_install_name(i.name)) continue;
         var components = std.mem.splitScalar(u8, i.name[4..], '-');
         _ = components.next();
         _ = components.next();
         const version = components.next() orelse unreachable;
-        try versions.append(try alloc.dupe(u8, version));
+        try versions.append(alloc, try alloc.dupe(u8, version));
     }
     return versions.items;
 }
@@ -238,8 +238,8 @@ fn update_zig_installation(alloc: Allocator, cp: CommonPaths, version_possible: 
         versions = @constCast(&[1][]const u8{v});
     } else versions = try installed_versions(alloc, cp);
 
-    var updated_now = std.ArrayList([]const u8).init(alloc);
-    var already_update = std.ArrayList([]const u8).init(alloc);
+    var updated_now: std.ArrayList([]const u8) = .empty;
+    var already_update: std.ArrayList([]const u8) = .empty;
     var client = Client{ .allocator = alloc };
     defer client.deinit();
     const resp = try install.get_json_dslist(&client);
@@ -270,21 +270,21 @@ fn update_zig_installation(alloc: Allocator, cp: CommonPaths, version_possible: 
             } else {
                 var zig_version = try std.SemanticVersion.parse((try get_version_from_exe(alloc, release_name)).items);
                 var format_buf: [32]u8 = undefined;
-                var format_buf_stream = std.io.fixedBufferStream(&format_buf);
+                var format_buf_stream = std.Io.Writer.fixed(&format_buf);
                 zig_version.patch += 1;
-                try zig_version.format("", .{}, format_buf_stream.writer());
-                to_update = releases.object.contains(format_buf_stream.getWritten());
-                while (releases.object.contains(format_buf_stream.getWritten())) {
+                try zig_version.format(&format_buf_stream);
+                to_update = releases.object.contains(format_buf_stream.buffered());
+                while (releases.object.contains(format_buf_stream.buffered())) {
                     zig_version.patch += 1;
-                    try format_buf_stream.seekTo(0);
-                    try zig_version.format("", .{}, format_buf_stream.writer());
+                    format_buf_stream.end = 0;
+                    try zig_version.format(&format_buf_stream);
                 }
             }
             if (to_update) {
-                try updated_now.append(v);
+                try updated_now.append(alloc, v);
                 try install.install_release(alloc, &client, releases, &rel, cp);
             } else {
-                try already_update.append(v);
+                try already_update.append(alloc, v);
             }
         } else |_| {
             try install.install_release(alloc, &client, releases, &rel, cp);

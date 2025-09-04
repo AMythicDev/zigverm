@@ -10,6 +10,7 @@ pub fn build(b: *std.Build) !void {
     if (default_os.isBSD() or default_os.isDarwin() or default_os == std.Target.Os.Tag.linux) {
         common.link_libc = true;
     }
+    const zip = b.dependency("zip", .{});
 
     const strip = if (optimize == std.builtin.OptimizeMode.ReleaseSafe) true else null;
 
@@ -22,6 +23,8 @@ pub fn build(b: *std.Build) !void {
         }) },
     );
     zigverm.subsystem = .Console;
+    zigverm.root_module.addImport("zip", zip.module("zip"));
+
     const zig = b.addExecutable(.{ .name = "zig", .root_module = b.createModule(.{
         .root_source_file = b.path("src/zig/main.zig"),
         .target = target,

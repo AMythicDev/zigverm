@@ -14,6 +14,7 @@ const Sha256 = std.crypto.hash.sha2.Sha256;
 const release_name = common.release_name;
 const AtomicOrder = std.builtin.AtomicOrder;
 const time = std.time;
+const File = std.fs.File;
 
 const default_os = builtin.target.os.tag;
 const default_arch = builtin.target.cpu.arch;
@@ -43,11 +44,13 @@ pub fn install_release(alloc: Allocator, client: *Client, releases: json.Value, 
     var tarball = try get_correct_tarball(alloc, client, tarball_dw_filename, tarball_url, total_size, shasum, cp, 0);
     defer tarball.close();
 
-    var tarball_reader = std.io.bufferedReader(tarball.reader());
+    var buf: [4096]u8 = undefined;
+    var tarball_reader = tarball.reader(&buf);
+    const tbl_intf = &tarball_reader.interface;
 
     std.log.info("Extracting {s}", .{tarball_dw_filename});
     try cp.install_dir.deleteTree(try release_name(alloc, rel.*));
-    try extract_xz(alloc, cp, rel.*, tarball_reader.reader());
+    try extract_xz(alloc, cp, rel.*, tbl_intf);
 
     try cp.download_dir.deleteFile(tarball_dw_filename);
 }
@@ -58,11 +61,13 @@ fn get_correct_tarball(alloc: Allocator, client: *Client, tarball_dw_filename: [
     // open the file with .truncate = false and then later move the file cursor to the end of the file using seekFromEnd().
     // This is basically Zig's equivalent to *open in append mode*.
     var tarball = try cp.download_dir.createFile(tarball_dw_filename, .{ .read = true, .truncate = force_redownload });
-    const tarball_size = if (force_redownload) 0 else (try tarball.metadata()).size();
+    const tarball_size = if (force_redownload) 0 else try tarball.getEndPos();
+
+    var buf: [4096]u8 = undefined;
 
     if (tarball_size < total_size or force_redownload) {
         try tarball.seekTo(tarball_size);
-        var tarball_writer = std.io.bufferedWriter(tarball.writer());
+        var tarball_writer = tarball.writer(&buf);
         try download_tarball(
             alloc,
             client,
@@ -76,8 +81,9 @@ fn get_correct_tarball(alloc: Allocator, client: *Client, tarball_dw_filename: [
         std.log.info("Found already existing tarball, using that", .{});
     }
 
-    var tarball_reader = std.io.bufferedReader(tarball.reader());
-    const hash_matched = try check_hash(shasum, tarball_reader.reader());
+    var tarball_reader = tarball.reader(&buf);
+    const tbl_intf = &tarball_reader.interface;
+    const hash_matched = try check_hash(shasum, tbl_intf);
 
     if (!hash_matched) {
         if (tries < 3) {
@@ -92,7 +98,7 @@ fn get_correct_tarball(alloc: Allocator, client: *Client, tarball_dw_filename: [
     return tarball;
 }
 
-pub fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, tb_writer: anytype, tarball_size: u64, total_size: usize) !void {
+pub fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, tb_writer: *std.fs.File.Writer, tarball_size: u64, total_size: usize) !void {
     std.log.info("Downloading {s}", .{tb_url});
     const tarball_uri = try std.Uri.parse(tb_url);
 
@@ -105,17 +111,15 @@ pub fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, t
 
     // Attach the Range header for partial downloads
     if (tarball_size > 0) {
-        var size = std.ArrayList(u8).init(alloc);
-        try size.appendSlice("bytes=");
-        var size_writer = size.writer();
-        try std.fmt.formatInt(tarball_size, 10, .lower, .{}, &size_writer);
-        try size.append('-');
+        var size: std.ArrayListUnmanaged(u8) = .empty;
+        try size.print(alloc, "bytes={}-", .{tarball_size});
         req.?.extra_headers = &.{http.Header{ .name = "Range", .value = size.items }};
     }
 
-    try req.?.send();
-    try req.?.wait();
-    var reader = req.?.reader();
+    try req.?.sendBodiless();
+    var response = try req.?.receiveHead(&.{});
+
+    var reader = response.reader(&.{});
 
     var buff: [1024]u8 = undefined;
 
@@ -125,21 +129,24 @@ pub fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, t
     const tarball_size_d: f64 = @floatFromInt(tarball_size);
 
     const progress_thread = try std.Thread.spawn(.{}, download_progress_bar, .{ &dlnow, tarball_size_d, total_size_d });
+    const tbw_intf = &tb_writer.interface;
     while (tarball_size_d + dlnow.load(AtomicOrder.monotonic) <= total_size_d) {
-        const len = try reader.read(&buff);
+        const len = try reader.readSliceShort(&buff);
         if (len == 0) {
             break;
         }
-        _ = try tb_writer.write(buff[0..len]);
+        _ = try tbw_intf.write(buff[0..len]);
 
         _ = dlnow.fetchAdd(@floatFromInt(len), AtomicOrder.monotonic);
     }
     progress_thread.join();
-    try tb_writer.flush();
+    try tb_writer.end();
 }
 
 pub fn download_progress_bar(dlnow: *std.atomic.Value(f32), tarball_size: f64, total_size: f64) !void {
-    var stderr_writer = std.io.getStdErr().writer();
+    const stderr = std.fs.File.stderr();
+    var stderrw = std.fs.File.Writer.init(stderr, &.{});
+    const stderr_writer = &stderrw.interface;
     var progress_bar: [150]u8 = ("░" ** 50).*;
     var bars: u8 = 0;
     var timer = try time.Timer.start();
@@ -157,7 +164,7 @@ pub fn download_progress_bar(dlnow: *std.atomic.Value(f32), tarball_size: f64, t
 
         if (downloaded + tarball_size >= total_size) break;
 
-        std.time.sleep(500 * time.ns_per_ms);
+        std.Thread.sleep(500 * time.ns_per_ms);
         downloaded = dlnow.load(AtomicOrder.monotonic);
     }
     try stderr_writer.print("\n", .{});
@@ -174,40 +181,39 @@ pub fn get_json_dslist(client: *Client) anyerror!JsonResponse {
         std.process.exit(1);
     }
 
-    try req.?.send();
-    try req.?.wait();
+    try req.?.sendBodiless();
+    var response = try req.?.receiveHead(&.{});
 
     var json_buff: [1024 * 100]u8 = undefined;
-    const bytes_read = try req.?.reader().readAll(&json_buff);
+    const res_r = response.reader(&.{});
+    const bytes_read = try res_r.readSliceShort(&json_buff);
 
     return JsonResponse{ .body = json_buff, .length = bytes_read };
 }
 
 pub fn make_request(client: *Client, uri: std.Uri) ?Client.Request {
+    // TODO: REMOVE THIS IF UNUSED
     var http_header_buff: [8192]u8 = undefined;
+    _ = &http_header_buff;
     for (0..5) |i| {
-        const tryreq = client.open(
-            http.Method.GET,
-            uri,
-            Client.RequestOptions{ .server_header_buffer = &http_header_buff },
-        );
+        const tryreq = client.request(http.Method.GET, uri, .{});
         if (tryreq) |r| {
             return r;
         } else |err| {
             std.log.warn("{}. Retrying again [{}/5]", .{ err, i + 1 });
-            std.time.sleep(std.time.ns_per_ms * 500);
+            std.Thread.sleep(std.time.ns_per_ms * 500);
         }
     }
     return null;
 }
 
-pub fn check_hash(hashstr: *const [64]u8, reader: anytype) !bool {
+pub fn check_hash(hashstr: *const [64]u8, reader: *std.Io.Reader) !bool {
     var buff: [1024]u8 = undefined;
 
     var hasher = Sha256.init(.{});
 
     while (true) {
-        const len = try reader.read(&buff);
+        const len = try reader.readSliceShort(&buff);
         if (len == 0) {
             break;
         }
@@ -218,10 +224,14 @@ pub fn check_hash(hashstr: *const [64]u8, reader: anytype) !bool {
     return std.mem.eql(u8, &hasher.finalResult(), &hash);
 }
 
-inline fn extract_xz(alloc: Allocator, dirs: CommonPaths, rel: Release, reader: anytype) !void {
-    var xz = try std.compress.xz.decompress(alloc, reader);
+inline fn extract_xz(alloc: Allocator, dirs: CommonPaths, rel: Release, reader: *std.Io.Reader) !void {
+    // HACK: Use the older interface until Zig upgrades this
+    const r = reader.adaptToOldInterface();
+    var xz = try std.compress.xz.decompress(alloc, r);
     const release_dir = try dirs.install_dir.makeOpenPath(try release_name(alloc, rel), .{});
-    try std.tar.pipeToFileSystem(release_dir, xz.reader(), .{ .strip_components = 1 });
+    var adpt = xz.reader().adaptToNewApi(&.{});
+    const intf = &adpt.new_interface;
+    try std.tar.pipeToFileSystem(release_dir, intf, .{ .strip_components = 1 });
 }
 
 pub fn target_name() []const u8 {

@@ -38,19 +38,19 @@ pub fn main() !void {
         "zig",
     });
 
-    var executable = std.ArrayList([]const u8).init(alloc);
-    try executable.append(zig_path);
+    var executable: std.ArrayListUnmanaged([]const u8) = .empty;
+    try executable.append(alloc, zig_path);
 
-    if (!version_specified) if (next_arg) |arg| try executable.append(arg);
+    if (!version_specified) if (next_arg) |arg| try executable.append(alloc, arg);
 
     while (args_iter.next()) |arg| {
-        try executable.append(arg);
+        try executable.append(alloc, arg);
     }
 
     var child = std.process.Child.init(executable.items, alloc);
-    child.stdin = std.io.getStdIn();
-    child.stdout = std.io.getStdOut();
-    child.stderr = std.io.getStdErr();
+    child.stdin = std.fs.File.stdin();
+    child.stdout = std.fs.File.stdout();
+    child.stderr = std.fs.File.stderr();
     const term = child.spawnAndWait() catch return ExecError.VersionNotInstalled;
     std.process.exit(term.Exited);
 }
