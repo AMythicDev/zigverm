@@ -57,8 +57,7 @@ shell supported is listed below:
 ### Compiling
 
 Requirements:
-
-- Zig >= 0.12.0. See [this](https://github.com/AMythicDev/zigverm#note-for-zig--v014) for Zig v0.14.
+- Zig master
 - libc on non-Windows systems. Can be provided by Zig itself, if available for the platform.
 - `git`, if you want to compile the latest commit or you want to develop `zigverm`.
 
