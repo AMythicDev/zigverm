@@ -108,9 +108,13 @@ fn read_github_releases_data(alloc: Allocator, client: *Client) !json.Parsed(jso
     req.?.extra_headers = &.{ http.Header{ .name = "Accept", .value = "application/vnd.github+json" }, http.Header{ .name = "X-GitHub-Api-Version", .value = "2022-11-28" } };
     try req.?.sendBodiless();
 
+    var tbuf: [1024]u8 = undefined;
+    var dbuf: [std.compress.flate.max_window_len]u8 = undefined;
+    var decomp = http.Decompress{ .none = undefined };
     var resp = try req.?.receiveHead(&.{});
-    const body = resp.reader(&.{});
 
-    var json_reader = json.Reader.init(alloc, body);
+    const res_r = resp.readerDecompressing(&tbuf, &decomp, &dbuf);
+
+    var json_reader = json.Reader.init(alloc, res_r);
     return try json.parseFromTokenSource(json.Value, alloc, &json_reader, .{});
 }

@@ -132,12 +132,12 @@ pub fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, t
     const tbw_intf = &tb_writer.interface;
     while (tarball_size_d + dlnow.load(AtomicOrder.monotonic) <= total_size_d) {
         const len = try reader.readSliceShort(&buff);
-        if (len == 0) {
+        _ = try tbw_intf.write(buff[0..len]);
+        _ = dlnow.fetchAdd(@floatFromInt(len), AtomicOrder.monotonic);
+
+        if (len < buff.len) {
             break;
         }
-        _ = try tbw_intf.write(buff[0..len]);
-
-        _ = dlnow.fetchAdd(@floatFromInt(len), AtomicOrder.monotonic);
     }
     progress_thread.join();
     try tb_writer.end();
@@ -184,11 +184,15 @@ pub fn get_json_dslist(client: *Client) anyerror!JsonResponse {
     try req.?.sendBodiless();
     var response = try req.?.receiveHead(&.{});
 
-    var json_buff: [1024 * 100]u8 = undefined;
-    const res_r = response.reader(&.{});
-    const bytes_read = try res_r.readSliceShort(&json_buff);
+    var tbuf: [1024]u8 = undefined;
+    var dbuf: [std.compress.flate.max_window_len]u8 = undefined;
+    var json_buf: [1024 * 100]u8 = undefined;
+    var decomp = http.Decompress{ .none = undefined };
 
-    return JsonResponse{ .body = json_buff, .length = bytes_read };
+    const res_r = response.readerDecompressing(&tbuf, &decomp, &dbuf);
+    const bytes_read = try res_r.readSliceShort(&json_buf);
+
+    return JsonResponse{ .body = json_buf, .length = bytes_read };
 }
 
 pub fn make_request(client: *Client, uri: std.Uri) ?Client.Request {
@@ -226,11 +230,11 @@ pub fn check_hash(hashstr: *const [64]u8, reader: *std.Io.Reader) !bool {
 
 inline fn extract_xz(alloc: Allocator, dirs: CommonPaths, rel: Release, reader: *std.Io.Reader) !void {
     // HACK: Use the older interface until Zig upgrades this
-    const r = reader.adaptToOldInterface();
-    var xz = try std.compress.xz.decompress(alloc, r);
+    const buff = try alloc.alloc(u8, 4096);
+    var xz = try std.compress.xz.Decompress.init(reader, alloc, buff);
+    defer alloc.free(xz.takeBuffer());
     const release_dir = try dirs.install_dir.makeOpenPath(try release_name(alloc, rel), .{});
-    var adpt = xz.reader().adaptToNewApi(&.{});
-    const intf = &adpt.new_interface;
+    const intf = &xz.reader;
     try std.tar.pipeToFileSystem(release_dir, intf, .{ .strip_components = 1 });
 }
 
