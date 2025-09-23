@@ -29,12 +29,11 @@ pub const Release = struct {
             ReleaseSpec.FullVersionSpec => |v| return try alloc.dupe(u8, v),
             else => {
                 if (self.actual_version == null) @panic("actual_version() called without resolving");
-                var buffer: std.ArrayListUnmanaged(u8) = .empty;
-                defer buffer.deinit(alloc);
-                var writer = std.Io.Writer.Allocating.fromArrayList(alloc, &buffer);
+                var writer = std.Io.Writer.Allocating.init(alloc);
                 const intf = &writer.writer;
                 try self.actual_version.?.format(intf);
-                return try alloc.dupe(u8, buffer.items);
+                const fmt = try writer.toOwnedSlice();
+                return try alloc.dupe(u8, fmt);
             },
         }
     }
