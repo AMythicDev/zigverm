@@ -2,6 +2,11 @@
 
 This file documents all changes made to the project and is updated before each release.
 
+## v0.7.0 [2025-09-24]
+### Changed
+- Requires Zig master to build correctly
+- Upgrade to zip.zig v0.3.1
+
 ## v0.6.2 [2025-02-04]
 ### Fixed
 - JSON parser returns syntax error when parsing large overrides.json file
