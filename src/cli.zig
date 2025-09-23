@@ -88,10 +88,10 @@ pub const Cli = union(enum) {
         } else if (streql(cmd, "info")) {
             command = Cli.show;
         } else if (streql(cmd, "-h") or streql(cmd, "--help")) {
-            utils.printStdOut("{s}\n", .{helptext});
+            try utils.printStdOut("{s}\n", .{helptext});
             std.process.exit(0);
         } else if (streql(cmd, "-V") or streql(cmd, "--version")) {
-            utils.printStdOut("{s}\n", .{Version});
+            try utils.printStdOut("{s}\n", .{Version});
             std.process.exit(0);
         } else if (streql(cmd, "update-self")) {
             command = Cli.update_self;

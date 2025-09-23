@@ -72,11 +72,13 @@ pub inline fn is_valid_arch_os(arch: ?[]const u8, os: ?[]const u8) bool {
     return result;
 }
 
-pub fn printStdOut(comptime fmt: []const u8, args: anytype) void {
+pub fn printStdOut(comptime fmt: []const u8, args: anytype) std.Io.Writer.Error!void {
     var buf: [1024]u8 = undefined;
-    var writer = std.fs.File.stdout().writer(&buf);
+    var stdout = std.fs.File.stdout();
+    var writer = stdout.writer(&buf);
     const intf = &writer.interface;
-    nosuspend intf.print(fmt, args) catch return;
+    nosuspend try intf.print(fmt, args);
+    try intf.flush();
 }
 
 pub fn make_request(client: *Client, uri: std.Uri) ?Client.Request {
