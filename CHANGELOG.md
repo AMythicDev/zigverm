@@ -2,9 +2,18 @@
 
 This file documents all changes made to the project and is updated before each release.
 
+## v0.7.1 [2025-09-26]
+### Fixed
+- `update-self` now works on all systems
+
+### Dependencies
+- Upgrade to zip.zig v0.3.2
+
 ## v0.7.0 [2025-09-24]
 ### Changed
 - Requires Zig master to build correctly
+
+### Dependencies
 - Upgrade to zip.zig v0.3.1
 
 ## v0.6.2 [2025-02-04]

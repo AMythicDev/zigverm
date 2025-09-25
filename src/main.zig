@@ -16,7 +16,7 @@ const CommonPaths = paths.CommonPaths;
 const Release = common.Release;
 const install = @import("install.zig");
 
-pub const Version = "0.7.0";
+pub const Version = "0.7.1";
 
 pub fn main() !void {
     var aa = std.heap.ArenaAllocator.init(std.heap.page_allocator);
