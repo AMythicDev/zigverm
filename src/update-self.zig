@@ -88,7 +88,6 @@ pub fn update_self(alloc: Allocator, cp: CommonPaths) !void {
         const file = try bin_dir.createFile(filename, .{ .truncate = true, .lock = .shared });
         var file_writer = file.writer(&buf);
         const intf = &file_writer.interface;
-        // HACK: Fix this once zip.zig fixes its decompressWriter function signature.
         defer file.close();
 
         try entry.decompressWriter(intf);
