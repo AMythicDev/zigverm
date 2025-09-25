@@ -73,7 +73,11 @@ def make_target_release(target: str, version: str):
             stderr=subprocess.DEVNULL,
         )
 
-        with zipfile.ZipFile("releases/" + target_dir + ".zip", "w") as z:
+        with zipfile.ZipFile(
+            "releases/" + target_dir + ".zip",
+            "w",
+            compression=zipfile.ZIP_DEFLATED,
+        ) as z:
             z.write("releases/" + target_dir, target_dir)
             if target[1] == "windows":
                 exe_ext = ".exe"
