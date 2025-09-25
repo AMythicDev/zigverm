@@ -68,6 +68,7 @@ pub fn update_self(alloc: Allocator, cp: CommonPaths) !void {
     };
 
     try download_tarball.createDownloadFile(cp);
+    defer download_tarball.deinit() catch {};
     if (download_tarball.file_size < download_tarball.actual_size)
         try install.download_tarball(alloc, &client, download_tarball.url, &download_tarball.writer.?, download_tarball.file_size, download_tarball.actual_size);
     try download_tarball.file_handle.?.seekTo(0);
@@ -93,10 +94,11 @@ pub fn update_self(alloc: Allocator, cp: CommonPaths) !void {
         defer file.close();
 
         try entry.decompressWriter(intf);
-        try file.chmod(0o755);
+        if (builtin.os.tag != .windows) {
+            try file.chmod(0o755);
+        }
     }
-    std.debug.print("zigverm updated successfully\n", .{});
-    defer download_tarball.deinit() catch {};
+    std.log.info("zigverm updated successfully\n", .{});
     try cp.download_dir.deleteFile(full_dl_filename);
 }
 
