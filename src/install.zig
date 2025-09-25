@@ -117,7 +117,8 @@ pub fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, t
     }
 
     try req.?.sendBodiless();
-    var response = try req.?.receiveHead(&.{});
+    var redir_buf: [1024]u8 = undefined;
+    var response = try req.?.receiveHead(&redir_buf);
 
     var reader = response.reader(&.{});
 
