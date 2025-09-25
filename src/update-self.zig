@@ -83,16 +83,21 @@ pub fn update_self(alloc: Allocator, cp: CommonPaths) !void {
     while (m_iter.next()) |i| {
         var entry = i.value_ptr.*;
         if (entry.is_dir) continue;
-
         const filename = std.fs.path.basename(i.key_ptr.*);
+        bin_dir.deleteFile(filename) catch |e| {
+            if (e != error.FileNotFound) return e;
+        };
         const file = try bin_dir.createFile(filename, .{ .truncate = true, .lock = .shared });
         var file_writer = file.writer(&buf);
         const intf = &file_writer.interface;
         defer file.close();
 
         try entry.decompressWriter(intf);
+        try file.chmod(0o755);
     }
-    std.debug.print("zigverm updated successfully", .{});
+    std.debug.print("zigverm updated successfully\n", .{});
+    defer download_tarball.deinit() catch {};
+    try cp.download_dir.deleteFile(full_dl_filename);
 }
 
 fn read_github_releases_data(alloc: Allocator, client: *Client) !json.Parsed(json.Value) {
