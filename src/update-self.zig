@@ -72,7 +72,6 @@ pub fn update_self(alloc: Allocator, cp: CommonPaths) !void {
     if (download_tarball.file_size < download_tarball.actual_size)
         try install.download_tarball(alloc, &client, download_tarball.url, &download_tarball.writer.?, download_tarball.file_size, download_tarball.actual_size);
     try download_tarball.file_handle.?.seekTo(0);
-    const bin_dir = try cp.zigverm_root.openDir("bin/", .{});
 
     var buf: [4096]u8 = undefined;
     var src = File.Reader.init(download_tarball.file_handle.?, &buf);
@@ -80,26 +79,34 @@ pub fn update_self(alloc: Allocator, cp: CommonPaths) !void {
     var zipfile = try ZipArchive.openFromFileReader(alloc, &src);
     defer zipfile.close();
 
-    var m_iter = zipfile.members.iterator();
-    while (m_iter.next()) |i| {
-        var entry = i.value_ptr.*;
-        if (entry.is_dir) continue;
-        const filename = std.fs.path.basename(i.key_ptr.*);
-        bin_dir.deleteFile(filename) catch |e| {
-            if (e != error.FileNotFound) return e;
-        };
-        const file = try bin_dir.createFile(filename, .{ .truncate = true, .lock = .shared });
-        var file_writer = file.writer(&buf);
-        const intf = &file_writer.interface;
-        defer file.close();
+    const zigverm_path = try std.mem.join(alloc, "/", &.{ dl_filename, "zigverm" });
+    const zig_path = try std.mem.join(alloc, "/", &.{ dl_filename, "zigverm" });
+    try writeZipMember(zipfile, zigverm_path, cp);
+    try writeZipMember(zipfile, zig_path, cp);
 
-        try entry.decompressWriter(intf);
-        if (builtin.os.tag != .windows) {
-            try file.chmod(0o755);
-        }
-    }
-    std.log.info("zigverm updated successfully\n", .{});
+    std.log.info("zigverm updated successfully", .{});
     try cp.download_dir.deleteFile(full_dl_filename);
+}
+
+fn writeZipMember(zipfile: ZipArchive, path: []const u8, cp: CommonPaths) !void {
+    const filename = std.fs.path.basename(path);
+    const bin_dir = try cp.zigverm_root.openDir("bin/", .{});
+    bin_dir.deleteFile(filename) catch |e| {
+        if (e != error.FileNotFound) return e;
+    };
+
+    var buf: [4096]u8 = undefined;
+    const file = try bin_dir.createFile(filename, .{ .truncate = true, .lock = .shared });
+    var file_writer = file.writer(&buf);
+    const intf = &file_writer.interface;
+    defer file.close();
+
+    var entry = zipfile.getFileByName(path).?;
+
+    try entry.decompressWriter(intf);
+    if (builtin.os.tag != .windows) {
+        try file.chmod(0o755);
+    }
 }
 
 fn read_github_releases_data(alloc: Allocator, client: *Client) !json.Parsed(json.Value) {
