@@ -149,7 +149,7 @@ fn show_info(alloc: Allocator, cp: CommonPaths) !void {
 
     const active_version = (try overrides.active_version(dir_to_check));
 
-    std.debug.print("Active version: {s} (from '{s}')\n\n", .{ active_version.ver, active_version.from });
+    std.debug.print("Active version: {s} (override '{s}')\n\n", .{ active_version.ver, active_version.from });
     std.debug.print("Installed releases:\n\n", .{});
 
     var n: u8 = 1;

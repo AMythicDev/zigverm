@@ -76,12 +76,6 @@ zig build --release=safe
 - You will have `zigverm` and `zig` in `zig-out/bin/` directory
 - Lastly follow the same steps [for windows](#for-windows)
 
-#### Note for Zig >= v0.14
-There have been some API changes in Zig v0.14 (not released yet) which makes zigverm fail 
-to compile on these versions of Zig. All the changes required to fix this is issue is being 
-tracked in [this](https://github.com/AMythicDev/zigverm/pull/2) PR. It will be merged into 
-main once this version of Zig comes out.
-
 ## Features
 
 - [x] Install versions (master, stable, x.y x.y.z)
