@@ -117,28 +117,27 @@ pub fn main() !void {
     var bin_dir = try zigverm_dir.openDir("bin", .{});
     defer bin_dir.close();
 
-    const path_in_zip = try std.mem.join(allocator, "/", &.{ dl_filename, "zigverm.exe" });
+    const zigverm_path = try std.mem.join(allocator, "/", &.{ dl_filename, "zigverm.exe" });
+    const zig_path = try std.mem.join(allocator, "/", &.{ dl_filename, "zig.exe" });
 
-    if (zipfile.getFileByName(path_in_zip)) |*entry| {
-        const out_filename = std.fs.path.basename(path_in_zip);
-        var file = try bin_dir.createFile(out_filename, .{ .truncate = true });
-        var fwriter = file.writer(&.{});
-        const writer = &fwriter.interface;
-        defer file.close();
+    try writeFilesFromZip(bin_dir, zipfile, zigverm_path);
+    try writeFilesFromZip(bin_dir, zipfile, zig_path);
 
-        var entry_ptr = @constCast(entry);
-
-        // Fix for error: expected 'std.io.Writer(std.fs.File,std.os.WriteError,std.fs.File.write)', found 'std.fs.File.Writer'
-        // The type returned by file.writer() is usually correct.
-        // Let's check entry.decompressWriter signature.
-        try entry_ptr.decompressWriter(writer);
-        std.log.info("Extracted {s} to bin/", .{out_filename});
-    } else {
-        std.log.err("Could not find {s} in archive", .{path_in_zip});
-    }
+    std.log.info("Installed zigverm successfully", .{});
 }
 
-pub fn download_tarball(alloc: std.mem.Allocator, client: *Client, io: Io, tb_url: []const u8, tb_writer: *std.fs.File.Writer, tarball_size: u64, total_size: usize) !void {
+fn writeFilesFromZip(bin_dir: std.fs.Dir, zipFile: ZipArchive, filename: []const u8) !void {
+    const entry = zipFile.getFileByName(filename) orelse unreachable;
+    const out_filename = std.fs.path.basename(filename);
+    var file = try bin_dir.createFile(out_filename, .{ .truncate = true });
+    var fwriter = file.writer(&.{});
+    const writer = &fwriter.interface;
+    defer file.close();
+    var entry_ptr = @constCast(&entry);
+    try entry_ptr.decompressWriter(writer);
+}
+
+fn download_tarball(alloc: std.mem.Allocator, client: *Client, io: Io, tb_url: []const u8, tb_writer: *std.fs.File.Writer, tarball_size: u64, total_size: usize) !void {
     std.log.info("Downloading {s}", .{tb_url});
     const tarball_uri = try std.Uri.parse(tb_url);
 
