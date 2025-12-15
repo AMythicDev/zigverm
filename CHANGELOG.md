@@ -2,7 +2,7 @@
 
 This file documents all changes made to the project and is updated before each release.
 
-## v0.7.1 [2025-09-26]
+## v0.7.2 [2025-12-15]
 ### Fixed
 - Windows binary releases being published without `.exe` extension
 
