@@ -15,12 +15,15 @@ const streql = common.streql;
 const CommonPaths = paths.CommonPaths;
 const Release = common.Release;
 const install = @import("install.zig");
+const Io = std.Io;
 
 pub const Version = "0.7.1";
 
 pub fn main() !void {
     var aa = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     const alloc = aa.allocator();
+    var threaded = std.Io.Threaded.init(alloc);
+    const io = threaded.io();
 
     const command = try Cli.read_args(alloc);
 
@@ -35,21 +38,21 @@ pub fn main() !void {
                 std.process.exit(0);
             } else |_| {}
 
-            var client = Client{ .allocator = alloc };
+            var client = Client{ .allocator = alloc, .io = io };
             defer client.deinit();
 
-            const resp = try install.get_json_dslist(&client);
+            const resp = try install.get_json_dslist(io, &client);
             const releases = try json.parseFromSliceLeaky(json.Value, alloc, resp.body[0..resp.length], .{});
 
-            try install.install_release(alloc, &client, releases, &rel, cp);
+            try install.install_release(alloc, io, &client, releases, &rel, cp);
         },
         Cli.remove => |version| {
             const rel = try Release.releaseFromVersion(version);
             try remove_release(alloc, rel, cp);
         },
-        Cli.show => try show_info(alloc, cp),
-        Cli.std => |ver| try open_std(alloc, cp, ver),
-        Cli.reference => |ver| try open_reference(alloc, cp, ver),
+        Cli.show => try show_info(alloc, io, cp),
+        Cli.std => |ver| try open_std(alloc, io, cp, ver),
+        Cli.reference => |ver| try open_reference(alloc, io, cp, ver),
         Cli.override => |oa| {
             var override_args = oa;
             const rel = try Release.releaseFromVersion(override_args.version);
@@ -57,14 +60,14 @@ pub fn main() !void {
                 override_args.directory = try std.fs.realpathAlloc(alloc, override_args.directory.?);
             }
             const directory = override_args.directory orelse try std.process.getCwdAlloc(alloc);
-            try override(alloc, cp, rel, directory);
+            try override(alloc, io, cp, rel, directory);
         },
         Cli.override_rm => |dir| {
             const directory = dir orelse try std.process.getCwdAlloc(alloc);
-            try override_rm(alloc, cp, directory);
+            try override_rm(alloc, io, cp, directory);
         },
-        Cli.update_self => try update_self.update_self(alloc, cp),
-        Cli.update => |version_possible| try update_zig_installation(alloc, cp, version_possible),
+        Cli.update_self => try update_self.update_self(alloc, io, cp),
+        Cli.update => |version_possible| try update_zig_installation(alloc, io, cp, version_possible),
     }
 }
 
@@ -79,13 +82,13 @@ fn remove_release(alloc: Allocator, rel: Release, cp: CommonPaths) !void {
     }
 }
 
-fn open_std(alloc: Allocator, cp: CommonPaths, ver: ?[]const u8) !void {
+fn open_std(alloc: Allocator, io: Io, cp: CommonPaths, ver: ?[]const u8) !void {
     var best_match: []const u8 = undefined;
     if (ver) |v| {
         best_match = v;
     } else {
         const dir_to_check = try std.process.getCwdAlloc(alloc);
-        var overrides = try common.overrides.read_overrides(alloc, cp);
+        var overrides = try common.overrides.read_overrides(alloc, io, cp);
         defer overrides.deinit();
 
         best_match = try alloc.dupe(u8, (try overrides.active_version(dir_to_check)).ver);
@@ -106,13 +109,13 @@ fn open_std(alloc: Allocator, cp: CommonPaths, ver: ?[]const u8) !void {
     std.process.exit(term.Exited);
 }
 
-fn open_reference(alloc: Allocator, cp: CommonPaths, ver: ?[]const u8) !void {
+fn open_reference(alloc: Allocator, io: Io, cp: CommonPaths, ver: ?[]const u8) !void {
     var best_match: []const u8 = undefined;
     if (ver) |v| {
         best_match = v;
     } else {
         const dir_to_check = try std.process.getCwdAlloc(alloc);
-        var overrides = try common.overrides.read_overrides(alloc, cp);
+        var overrides = try common.overrides.read_overrides(alloc, io, cp);
         defer overrides.deinit();
 
         best_match = try alloc.dupe(u8, (try overrides.active_version(dir_to_check)).ver);
@@ -139,12 +142,12 @@ fn open_reference(alloc: Allocator, cp: CommonPaths, ver: ?[]const u8) !void {
     try child.spawn();
 }
 
-fn show_info(alloc: Allocator, cp: CommonPaths) !void {
+fn show_info(alloc: Allocator, io: Io, cp: CommonPaths) !void {
     std.debug.print("zigverm root:\t{s}\n\n", .{CommonPaths.get_zigverm_root()});
     var iter = cp.install_dir.iterate();
 
     const dir_to_check = try std.process.getCwdAlloc(alloc);
-    var overrides = try common.overrides.read_overrides(alloc, cp);
+    var overrides = try common.overrides.read_overrides(alloc, io, cp);
     defer overrides.deinit();
 
     const active_version = (try overrides.active_version(dir_to_check));
@@ -162,8 +165,8 @@ fn show_info(alloc: Allocator, cp: CommonPaths) !void {
     }
 }
 
-fn override(alloc: Allocator, cp: CommonPaths, rel: Release, directory: []const u8) !void {
-    var overrides = try common.overrides.read_overrides(alloc, cp);
+fn override(alloc: Allocator, io: Io, cp: CommonPaths, rel: Release, directory: []const u8) !void {
+    var overrides = try common.overrides.read_overrides(alloc, io, cp);
     defer overrides.deinit();
     var actual_dir: []const u8 = undefined;
 
@@ -178,12 +181,12 @@ fn override(alloc: Allocator, cp: CommonPaths, rel: Release, directory: []const 
     try common.overrides.write_overrides(overrides, cp);
 }
 
-fn override_rm(alloc: Allocator, cp: CommonPaths, directory: []const u8) !void {
+fn override_rm(alloc: Allocator, io: Io, cp: CommonPaths, directory: []const u8) !void {
     if (streql(directory, "default")) {
         std.log.err("cannot remove the default override", .{});
         std.process.exit(1);
     }
-    var overrides = try common.overrides.read_overrides(alloc, cp);
+    var overrides = try common.overrides.read_overrides(alloc, io, cp);
     defer overrides.deinit();
     var actual_dir: []const u8 = undefined;
     if (streql(directory, "default"))
@@ -232,7 +235,7 @@ fn get_version_from_exe(alloc: Allocator, release_name: []const u8) !std.ArrayLi
     return version;
 }
 
-fn update_zig_installation(alloc: Allocator, cp: CommonPaths, version_possible: ?[]const u8) !void {
+fn update_zig_installation(alloc: Allocator, io: Io, cp: CommonPaths, version_possible: ?[]const u8) !void {
     var versions: [][]const u8 = undefined;
     if (version_possible) |v| {
         versions = @constCast(&[1][]const u8{v});
@@ -240,9 +243,9 @@ fn update_zig_installation(alloc: Allocator, cp: CommonPaths, version_possible: 
 
     var updated_now: std.ArrayList([]const u8) = .empty;
     var already_update: std.ArrayList([]const u8) = .empty;
-    var client = Client{ .allocator = alloc };
+    var client = Client{ .allocator = alloc, .io = io };
     defer client.deinit();
-    const resp = try install.get_json_dslist(&client);
+    const resp = try install.get_json_dslist(io, &client);
     const releases = try json.parseFromSliceLeaky(json.Value, alloc, resp.body[0..resp.length], .{});
 
     for (versions) |v| {
@@ -282,12 +285,12 @@ fn update_zig_installation(alloc: Allocator, cp: CommonPaths, version_possible: 
             }
             if (to_update) {
                 try updated_now.append(alloc, v);
-                try install.install_release(alloc, &client, releases, &rel, cp);
+                try install.install_release(alloc, io, &client, releases, &rel, cp);
             } else {
                 try already_update.append(alloc, v);
             }
         } else |_| {
-            try install.install_release(alloc, &client, releases, &rel, cp);
+            try install.install_release(alloc, io, &client, releases, &rel, cp);
         }
     }
     std.debug.print("\n", .{});

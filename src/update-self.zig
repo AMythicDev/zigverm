@@ -11,6 +11,7 @@ const CommonPaths = common.paths.CommonPaths;
 const Client = std.http.Client;
 const File = std.fs.File;
 const Allocator = std.mem.Allocator;
+const Io = std.Io;
 
 const DownloadTarball = struct {
     filename: []const u8,
@@ -38,12 +39,12 @@ const DownloadTarball = struct {
     }
 };
 
-pub fn update_self(alloc: Allocator, cp: CommonPaths) !void {
-    var client = Client{ .allocator = alloc };
+pub fn update_self(alloc: Allocator, io: Io, cp: CommonPaths) !void {
+    var client = Client{ .allocator = alloc, .io = io };
     defer client.deinit();
 
     std.log.info("getting latest index from github releases", .{});
-    const parsed = try read_github_releases_data(alloc, &client);
+    const parsed = try read_github_releases_data(alloc, io, &client);
 
     defer parsed.deinit();
 
@@ -70,11 +71,11 @@ pub fn update_self(alloc: Allocator, cp: CommonPaths) !void {
     try download_tarball.createDownloadFile(cp);
     defer download_tarball.deinit() catch {};
     if (download_tarball.file_size < download_tarball.actual_size)
-        try install.download_tarball(alloc, &client, download_tarball.url, &download_tarball.writer.?, download_tarball.file_size, download_tarball.actual_size);
+        try install.download_tarball(alloc, io, &client, download_tarball.url, &download_tarball.writer.?, download_tarball.file_size, download_tarball.actual_size);
     try download_tarball.file_handle.?.seekTo(0);
 
     var buf: [4096]u8 = undefined;
-    var src = File.Reader.init(download_tarball.file_handle.?, &buf);
+    var src = download_tarball.file_handle.?.reader(io, &buf);
 
     var zipfile = try ZipArchive.openFromFileReader(alloc, &src);
     defer zipfile.close();
@@ -109,9 +110,9 @@ fn writeZipMember(zipfile: ZipArchive, path: []const u8, cp: CommonPaths) !void 
     }
 }
 
-fn read_github_releases_data(alloc: Allocator, client: *Client) !json.Parsed(json.Value) {
+fn read_github_releases_data(alloc: Allocator, io: Io, client: *Client) !json.Parsed(json.Value) {
     const uri = try std.Uri.parse("https://api.github.com/repos/AMythicDev/zigverm/releases/latest");
-    var req = install.make_request(client, uri);
+    var req = install.make_request(client, io, uri);
     defer req.?.deinit();
 
     if (req == null) {

@@ -1,12 +1,15 @@
 const std = @import("std");
 const common = @import("common");
 const Allocator = std.mem.Allocator;
+const Io = std.Io;
 
 const ExecError = error{VersionNotInstalled};
 
 pub fn main() !void {
     var aa = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     const alloc = aa.allocator();
+    var threaded = std.Io.Threaded.init(alloc);
+    const io = threaded.io();
 
     var version: ?[]const u8 = null;
     var version_specified = false;
@@ -26,7 +29,7 @@ pub fn main() !void {
 
     if (version == null) {
         const dir_to_check = try std.process.getCwdAlloc(alloc);
-        var overrides = try common.overrides.read_overrides(alloc, cp);
+        var overrides = try common.overrides.read_overrides(alloc, io, cp);
         defer overrides.deinit();
         version = try alloc.dupe(u8, (try overrides.active_version(dir_to_check)).ver);
     }

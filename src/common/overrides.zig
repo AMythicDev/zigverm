@@ -4,6 +4,7 @@ const StringArrayHashMap = std.StringArrayHashMap;
 const json = std.json;
 const CommonPaths = @import("paths.zig").CommonPaths;
 const File = std.fs.File;
+const Io = std.Io;
 
 pub const OverrideMap = struct {
     backing_map: json.ObjectMap,
@@ -51,9 +52,9 @@ pub const OverrideMap = struct {
     }
 };
 
-pub fn read_overrides(alloc: Allocator, cp: CommonPaths) !OverrideMap {
+pub fn read_overrides(alloc: Allocator, io: Io, cp: CommonPaths) !OverrideMap {
     var buf: [4096]u8 = undefined;
-    var file_bufreader = File.Reader.init(cp.overrides, &buf);
+    var file_bufreader = cp.overrides.reader(io, &buf);
     const file_reader = &file_bufreader.interface;
 
     var overrides = OverrideMap{ .backing_map = json.ObjectMap.init(alloc), .allocator = alloc };

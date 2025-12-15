@@ -15,6 +15,7 @@ const release_name = common.release_name;
 const AtomicOrder = std.builtin.AtomicOrder;
 const time = std.time;
 const File = std.fs.File;
+const Io = std.Io;
 
 const default_os = builtin.target.os.tag;
 const default_arch = builtin.target.cpu.arch;
@@ -30,7 +31,7 @@ const InstallError = error{
     TargetNotAvailable,
 };
 
-pub fn install_release(alloc: Allocator, client: *Client, releases: json.Value, rel: *Release, cp: CommonPaths) !void {
+pub fn install_release(alloc: Allocator, io: Io, client: *Client, releases: json.Value, rel: *Release, cp: CommonPaths) !void {
     try rel.resolve(releases);
 
     const release: json.Value = releases.object.get(try rel.actualVersion(alloc)).?;
@@ -41,11 +42,11 @@ pub fn install_release(alloc: Allocator, client: *Client, releases: json.Value, 
 
     const tarball_dw_filename = try dw_tarball_name(alloc, rel.*);
 
-    var tarball = try get_correct_tarball(alloc, client, tarball_dw_filename, tarball_url, total_size, shasum, cp, 0);
+    var tarball = try get_correct_tarball(alloc, io, client, tarball_dw_filename, tarball_url, total_size, shasum, cp, 0);
     defer tarball.close();
 
     var buf: [4096]u8 = undefined;
-    var tarball_reader = tarball.reader(&buf);
+    var tarball_reader = tarball.reader(io, &buf);
     const tbl_intf = &tarball_reader.interface;
 
     std.log.info("Extracting {s}", .{tarball_dw_filename});
@@ -55,7 +56,7 @@ pub fn install_release(alloc: Allocator, client: *Client, releases: json.Value, 
     try cp.download_dir.deleteFile(tarball_dw_filename);
 }
 
-fn get_correct_tarball(alloc: Allocator, client: *Client, tarball_dw_filename: []const u8, tarball_url: []const u8, total_size: usize, shasum: *const [64]u8, cp: CommonPaths, tries: u8) !std.fs.File {
+fn get_correct_tarball(alloc: Allocator, io: Io, client: *Client, tarball_dw_filename: []const u8, tarball_url: []const u8, total_size: usize, shasum: *const [64]u8, cp: CommonPaths, tries: u8) !std.fs.File {
     const force_redownload = tries > 0;
     // IMPORTANT: To continue downloading if the file isn't completely downloaded AKA partial downloading, we
     // open the file with .truncate = false and then later move the file cursor to the end of the file using seekFromEnd().
@@ -70,6 +71,7 @@ fn get_correct_tarball(alloc: Allocator, client: *Client, tarball_dw_filename: [
         var tarball_writer = tarball.writer(&buf);
         try download_tarball(
             alloc,
+            io,
             client,
             tarball_url,
             &tarball_writer,
@@ -81,14 +83,14 @@ fn get_correct_tarball(alloc: Allocator, client: *Client, tarball_dw_filename: [
         std.log.info("Found already existing tarball, using that", .{});
     }
 
-    var tarball_reader = tarball.reader(&buf);
+    var tarball_reader = tarball.reader(io, &buf);
     const tbl_intf = &tarball_reader.interface;
     const hash_matched = try check_hash(shasum, tbl_intf);
 
     if (!hash_matched) {
         if (tries < 3) {
             std.log.warn("Hashes do match for downloaded tarball. Retrying again...", .{});
-            tarball = try get_correct_tarball(alloc, client, tarball_dw_filename, tarball_url, total_size, shasum, cp, tries + 1);
+            tarball = try get_correct_tarball(alloc, io, client, tarball_dw_filename, tarball_url, total_size, shasum, cp, tries + 1);
         } else {
             std.log.err("Hashes do match for downloaded tarball. Exitting", .{});
             return error.BadChecksum;
@@ -98,11 +100,11 @@ fn get_correct_tarball(alloc: Allocator, client: *Client, tarball_dw_filename: [
     return tarball;
 }
 
-pub fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, tb_writer: *std.fs.File.Writer, tarball_size: u64, total_size: usize) !void {
+pub fn download_tarball(alloc: Allocator, io: Io, client: *Client, tb_url: []const u8, tb_writer: *std.fs.File.Writer, tarball_size: u64, total_size: usize) !void {
     std.log.info("Downloading {s}", .{tb_url});
     const tarball_uri = try std.Uri.parse(tb_url);
 
-    var req = make_request(client, tarball_uri);
+    var req = make_request(client, io, tarball_uri);
     defer req.?.deinit();
     if (req == null) {
         std.log.err("Failed fetching the install tarball. Exitting (1)...", .{});
@@ -129,7 +131,7 @@ pub fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, t
     const total_size_d: f64 = @floatFromInt(total_size);
     const tarball_size_d: f64 = @floatFromInt(tarball_size);
 
-    const progress_thread = try std.Thread.spawn(.{}, download_progress_bar, .{ &dlnow, tarball_size_d, total_size_d });
+    const progress_thread = try std.Thread.spawn(.{}, download_progress_bar, .{ io, &dlnow, tarball_size_d, total_size_d });
     const tbw_intf = &tb_writer.interface;
     while (tarball_size_d + dlnow.load(AtomicOrder.monotonic) <= total_size_d) {
         const len = try reader.readSliceShort(&buff);
@@ -144,7 +146,7 @@ pub fn download_tarball(alloc: Allocator, client: *Client, tb_url: []const u8, t
     try tb_writer.end();
 }
 
-pub fn download_progress_bar(dlnow: *std.atomic.Value(f32), tarball_size: f64, total_size: f64) !void {
+pub fn download_progress_bar(io: Io, dlnow: *std.atomic.Value(f32), tarball_size: f64, total_size: f64) !void {
     const stderr = std.fs.File.stderr();
     var stderrw = std.fs.File.Writer.init(stderr, &.{});
     const stderr_writer = &stderrw.interface;
@@ -165,17 +167,17 @@ pub fn download_progress_bar(dlnow: *std.atomic.Value(f32), tarball_size: f64, t
 
         if (downloaded + tarball_size >= total_size) break;
 
-        std.Thread.sleep(500 * time.ns_per_ms);
+        io.sleep(.fromMilliseconds(500), .awake) catch {};
         downloaded = dlnow.load(AtomicOrder.monotonic);
     }
     try stderr_writer.print("\n", .{});
 }
 
-pub fn get_json_dslist(client: *Client) anyerror!JsonResponse {
+pub fn get_json_dslist(io: Io, client: *Client) anyerror!JsonResponse {
     std.log.info("Fetching the latest index", .{});
     const uri = try std.Uri.parse("https://ziglang.org/download/index.json");
 
-    var req = make_request(client, uri);
+    var req = make_request(client, io, uri);
     defer req.?.deinit();
     if (req == null) {
         std.log.err("Failed fetching the index. Exitting (1)...", .{});
@@ -196,7 +198,7 @@ pub fn get_json_dslist(client: *Client) anyerror!JsonResponse {
     return JsonResponse{ .body = json_buf, .length = bytes_read };
 }
 
-pub fn make_request(client: *Client, uri: std.Uri) ?Client.Request {
+pub fn make_request(client: *Client, io: Io, uri: std.Uri) ?Client.Request {
     // TODO: REMOVE THIS IF UNUSED
     var http_header_buff: [8192]u8 = undefined;
     _ = &http_header_buff;
@@ -206,7 +208,7 @@ pub fn make_request(client: *Client, uri: std.Uri) ?Client.Request {
             return r;
         } else |err| {
             std.log.warn("{}. Retrying again [{}/5]", .{ err, i + 1 });
-            std.Thread.sleep(std.time.ns_per_ms * 500);
+            io.sleep(.fromMilliseconds(500), .awake) catch {};
         }
     }
     return null;
