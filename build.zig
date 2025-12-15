@@ -4,15 +4,14 @@ const Compile = std.Build.Step.Compile;
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+    const strip = if (optimize == std.builtin.OptimizeMode.ReleaseSafe) true else null;
+    const default_os = target.result.os.tag;
 
     const common = b.createModule(.{ .root_source_file = b.path("src/common/root.zig") });
-    const default_os = target.result.os.tag;
     if (default_os.isBSD() or default_os.isDarwin() or default_os == std.Target.Os.Tag.linux) {
         common.link_libc = true;
     }
     const zip = b.dependency("zip", .{});
-
-    const strip = if (optimize == std.builtin.OptimizeMode.ReleaseSafe) true else null;
 
     const zigverm = b.addExecutable(
         .{ .name = "zigverm", .root_module = b.createModule(.{
@@ -23,6 +22,7 @@ pub fn build(b: *std.Build) !void {
         }) },
     );
     zigverm.subsystem = .Console;
+    zigverm.root_module.addImport("common", common);
     zigverm.root_module.addImport("zip", zip.module("zip"));
 
     const zig = b.addExecutable(.{ .name = "zig", .root_module = b.createModule(.{
@@ -32,33 +32,36 @@ pub fn build(b: *std.Build) !void {
         .strip = strip,
     }) });
     zig.subsystem = .Console;
-
-    zigverm.root_module.addImport("common", common);
-    // zigverm.root_module.addImport("zip", zip.module("zip"));
     zig.root_module.addImport("common", common);
+
+    const zigverm_setup = b.addExecutable(.{ .name = "zigverm-setup", .root_module = b.createModule(.{
+        .root_source_file = b.path("src/zigverm-setup/main.zig"),
+        .target = target,
+        .optimize = optimize,
+        .strip = strip,
+    }) });
+    zigverm_setup.subsystem = .Console;
+    zigverm_setup.root_module.addImport("common", common);
+    zigverm_setup.root_module.addImport("zip", zip.module("zip"));
+
     b.installArtifact(zigverm);
     b.installArtifact(zig);
+    b.installArtifact(zigverm_setup);
 
-    addExeRunner(b, zigverm, zig);
+    addExeRunner(b, zigverm, "run-zigverm");
+    addExeRunner(b, zig, "run-zig");
+    addExeRunner(b, zigverm_setup, "run-zigverm-setup");
     addTestRunner(b, target, optimize);
 }
 
-fn addExeRunner(b: *std.Build, zigverm: *Compile, zig: *Compile) void {
-    const run_zigverm = b.addRunArtifact(zigverm);
-    run_zigverm.step.dependOn(b.getInstallStep());
+fn addExeRunner(b: *std.Build, bin: *Compile, name: []const u8) void {
+    const run_bin = b.addRunArtifact(bin);
+    run_bin.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
-        run_zigverm.addArgs(args);
+        run_bin.addArgs(args);
     }
-    const run_zigverm_step = b.step("run-zigverm", "Run the app");
-    run_zigverm_step.dependOn(&run_zigverm.step);
-
-    const run_zig = b.addRunArtifact(zig);
-    run_zig.step.dependOn(b.getInstallStep());
-    if (b.args) |args| {
-        run_zig.addArgs(args);
-    }
-    const run_zig_step = b.step("run-zig", "Run the app");
-    run_zig_step.dependOn(&run_zig.step);
+    const run_zigverm_step = b.step(name, "Run the app");
+    run_zigverm_step.dependOn(&run_bin.step);
 }
 
 fn addTestRunner(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
