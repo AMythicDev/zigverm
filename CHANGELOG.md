@@ -4,6 +4,10 @@ This file documents all changes made to the project and is updated before each r
 
 ## v0.7.1 [2025-09-26]
 ### Fixed
+- Windows binary releases being published without `.exe` extension
+
+## v0.7.1 [2025-09-26]
+### Fixed
 - `update-self` now works on all systems
 
 ### Dependencies

@@ -57,21 +57,6 @@ def make_target_release(target: str, version: str):
             check=True,
             stderr=subprocess.DEVNULL,
         )
-        subprocess.run(
-            [
-                "zig",
-                "build",
-                "install",
-                "--prefix",
-                "releases/",
-                "--prefix-exe-dir",
-                target_dir,
-                "--release=safe",
-                f"-Dtarget={target_str}",
-            ],
-            check=True,
-            stderr=subprocess.DEVNULL,
-        )
 
         with zipfile.ZipFile("releases/" + target_dir + ".zip", "w") as z:
             z.write("releases/" + target_dir, target_dir)
@@ -81,9 +66,13 @@ def make_target_release(target: str, version: str):
                 exe_ext = ""
 
             z.write(
-                "releases/" + target_dir + "/zigverm" + exe_ext, target_dir + "/zigverm"
+                "releases/" + target_dir + "/zigverm" + exe_ext,
+                target_dir + "/zigverm" + exe_ext,
             )
-            z.write("releases/" + target_dir + "/zig" + exe_ext, target_dir + "/zig")
+            z.write(
+                "releases/" + target_dir + "/zig" + exe_ext,
+                target_dir + "/zig" + exe_ext,
+            )
             z.write("LICENSE", target_dir + "/LICENSE")
             z.write("README.md", target_dir + "/README")
     except subprocess.CalledProcessError as e:

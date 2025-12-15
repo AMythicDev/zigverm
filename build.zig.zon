@@ -1,6 +1,6 @@
 .{
     .name = .zigverm,
-    .version = "0.7.1",
+    .version = "0.7.2",
     .dependencies = .{
         .zip = .{
             .url = "https://github.com/AMythicDev/zip.zig/archive/refs/tags/v0.3.3.tar.gz",
