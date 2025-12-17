@@ -1,10 +1,10 @@
 .{
     .name = .zigverm,
-    .version = "0.7.2",
+    .version = "0.7.3",
     .dependencies = .{
         .zip = .{
-            .url = "https://github.com/AMythicDev/zip.zig/archive/refs/tags/v0.3.3.tar.gz",
-            .hash = "zip-0.3.3-eQGR_2pSAABP64MaMedp7ZYvEs2Nb9ODQgW0xdPJmWIX",
+            .url = "https://github.com/AMythicDev/zip.zig/archive/refs/tags/v0.3.4.tar.gz",
+            .hash = "zip-0.3.4-eQGR_7JSAABazroUrddw7q1saHUbm_fWjonrOxSnahTA",
         },
     },
     .minimum_zig_version = "0.15.1",

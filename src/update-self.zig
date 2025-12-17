@@ -80,8 +80,9 @@ pub fn update_self(alloc: Allocator, io: Io, cp: CommonPaths) !void {
     var zipfile = try ZipArchive.openFromFileReader(alloc, &src);
     defer zipfile.close();
 
-    const zigverm_path = try std.mem.join(alloc, "/", &.{ dl_filename, "zigverm" });
-    const zig_path = try std.mem.join(alloc, "/", &.{ dl_filename, "zigverm" });
+    const zigverm_path = try std.mem.join(alloc, "", &.{ dl_filename, "/zigverm", if (builtin.os.tag == .windows) ".exe" else "" });
+    const zig_path = try std.mem.join(alloc, "", &.{ dl_filename, "/zig", if (builtin.os.tag == .windows) ".exe" else "" });
+
     try writeZipMember(zipfile, zigverm_path, cp);
     try writeZipMember(zipfile, zig_path, cp);
 

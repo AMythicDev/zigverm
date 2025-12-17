@@ -11,7 +11,7 @@ pub fn build(b: *std.Build) !void {
     if (default_os.isBSD() or default_os.isDarwin() or default_os == std.Target.Os.Tag.linux) {
         common.link_libc = true;
     }
-    const zip = b.dependency("zip", .{});
+    const zip = b.dependency("zip", .{ .target = target, .optimize = optimize });
 
     const zigverm = b.addExecutable(
         .{ .name = "zigverm", .root_module = b.createModule(.{

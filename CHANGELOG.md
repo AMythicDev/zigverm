@@ -2,6 +2,11 @@
 
 This file documents all changes made to the project and is updated before each release.
 
+## v0.7.3 [2025-12-16]
+### Fixed
+- update-self command was writing partial binary files due to writer not flushing by zip.zig
+- update-self does not add `.exe` for Windows releases
+
 ## v0.7.2 [2025-12-15]
 ### Fixed
 - Windows binary releases being published without `.exe` extension
