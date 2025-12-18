@@ -124,6 +124,14 @@ pub fn main() !void {
     try writeFilesFromZip(bin_dir, zipfile, zig_path);
 
     std.log.info("Installed zigverm successfully", .{});
+
+    std.log.info("Installing latest stable zig version...", .{});
+    const installed_binary = try path.join(allocator, &.{ zigverm_dir_path, "bin", "zigverm.exe" });
+    var child = std.process.Child.init(&.{ installed_binary, "install", "stable" }, allocator);
+    child.stdin = std.fs.File.stdin();
+    child.stdout = std.fs.File.stdout();
+    child.stderr = std.fs.File.stderr();
+    _ = try child.spawnAndWait();
 }
 
 fn writeFilesFromZip(bin_dir: std.fs.Dir, zipFile: ZipArchive, filename: []const u8) !void {
@@ -137,7 +145,15 @@ fn writeFilesFromZip(bin_dir: std.fs.Dir, zipFile: ZipArchive, filename: []const
     try entry_ptr.decompressWriter(writer);
 }
 
-fn download_tarball(alloc: std.mem.Allocator, client: *Client, io: Io, tb_url: []const u8, tb_writer: *std.fs.File.Writer, tarball_size: u64, total_size: usize) !void {
+fn download_tarball(
+    alloc: std.mem.Allocator,
+    client: *Client,
+    io: Io,
+    tb_url: []const u8,
+    tb_writer: *std.fs.File.Writer,
+    tarball_size: u64,
+    total_size: usize,
+) !void {
     std.log.info("Downloading {s}", .{tb_url});
     const tarball_uri = try std.Uri.parse(tb_url);
 
