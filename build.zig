@@ -24,6 +24,9 @@ pub fn build(b: *std.Build) !void {
     zigverm.subsystem = .Console;
     zigverm.root_module.addImport("common", common);
     zigverm.root_module.addImport("zip", zip.module("zip"));
+    zigverm.root_module.addAnonymousImport("build.zig.zon", .{
+        .root_source_file = b.path("build.zig.zon"),
+    });
 
     const zig = b.addExecutable(.{ .name = "zig", .root_module = b.createModule(.{
         .root_source_file = b.path("src/zig/main.zig"),

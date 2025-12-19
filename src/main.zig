@@ -17,7 +17,7 @@ const Release = common.Release;
 const install = @import("install.zig");
 const Io = std.Io;
 
-pub const Version = "0.7.3";
+pub const Version: []const u8 = @import("build.zig.zon").version;
 
 pub fn main() !void {
     var aa = std.heap.ArenaAllocator.init(std.heap.page_allocator);
