@@ -5,7 +5,7 @@ on:
       - "src/zigverm-setup/main.zig"
     tags:
       - "*"
-    pull_request:
+  pull_request:
 
 jobs:
   install-on-windows:
