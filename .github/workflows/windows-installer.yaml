@@ -9,7 +9,7 @@ on:
 
 jobs:
   install-on-windows:
-    runs-on: ${{ matrix.target }}
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: mlugg/setup-zig@v2
