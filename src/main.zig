@@ -19,11 +19,10 @@ const Io = std.Io;
 
 pub const Version: []const u8 = @import("build.zig.zon").version;
 
-pub fn main() !void {
+pub fn main(init: std.process.Init) !void {
     var aa = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    const alloc = aa.allocator();
-    var threaded = std.Io.Threaded.init(alloc);
-    const io = threaded.io();
+    const alloc = init.arena.allocator()
+    const io = init.io;
 
     const command = try Cli.read_args(alloc);
 

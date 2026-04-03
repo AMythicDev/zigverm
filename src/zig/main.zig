@@ -5,15 +5,13 @@ const Io = std.Io;
 
 const ExecError = error{VersionNotInstalled};
 
-pub fn main() !void {
-    var aa = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    const alloc = aa.allocator();
-    var threaded = std.Io.Threaded.init(alloc);
-    const io = threaded.io();
+pub fn main(init: std.process.Init) !void {
+    const alloc = init.arena.allocator();
+    const io = init.io;
 
     var version: ?[]const u8 = null;
     var version_specified = false;
-    var args_iter = try std.process.argsWithAllocator(alloc);
+    var args_iter = init.environ_map.iterator();
     _ = args_iter.next();
 
     const next_arg = args_iter.next();

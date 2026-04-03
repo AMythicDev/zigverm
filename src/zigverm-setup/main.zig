@@ -35,13 +35,8 @@ const DownloadTarball = struct {
     }
 };
 
-pub fn main() !void {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
-
-    var threaded = Io.Threaded.init(allocator);
-    const io = threaded.io();
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
 
     const zigverm_dir_path = std.process.getEnvVarOwned(allocator, "ZIGVERM_ROOT_DIR") catch |e1| blk: {
         if (e1 == error.EnvironmentVariableNotFound) {

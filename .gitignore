@@ -2,4 +2,4 @@ zig-cache/
 .zig-cache/
 zig-out/
 releases/
-
+zig-pkg/

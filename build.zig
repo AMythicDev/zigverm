@@ -89,7 +89,7 @@ fn addTestRunner(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.
     }) });
     const default_os = target.result.os.tag;
     if (default_os.isBSD() or default_os.isDarwin() or default_os == std.Target.Os.Tag.linux) {
-        common_tests.linkLibC();
+        common_tests.is_linking_libc = true;
     }
     const run_common_tests = b.addRunArtifact(common_tests);
 
