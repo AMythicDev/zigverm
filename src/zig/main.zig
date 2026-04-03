@@ -11,7 +11,7 @@ pub fn main(init: std.process.Init) !void {
 
     var version: ?[]const u8 = null;
     var version_specified = false;
-    var args_iter = init.environ_map.iterator();
+    var args_iter = init.minimal.args.iterate();
     _ = args_iter.next();
 
     const next_arg = args_iter.next();
@@ -22,11 +22,11 @@ pub fn main(init: std.process.Init) !void {
         }
     }
 
-    var cp = try common.paths.CommonPaths.resolve(alloc);
-    defer cp.close();
+    var cp = try common.paths.CommonPaths.resolve(alloc, io, init.environ_map);
+    defer cp.close(io);
 
     if (version == null) {
-        const dir_to_check = try std.process.getCwdAlloc(alloc);
+        const dir_to_check = try std.process.currentPathAlloc(io, alloc);
         var overrides = try common.overrides.read_overrides(alloc, io, cp);
         defer overrides.deinit();
         version = try alloc.dupe(u8, (try overrides.active_version(dir_to_check)).ver);
@@ -48,10 +48,7 @@ pub fn main(init: std.process.Init) !void {
         try executable.append(alloc, arg);
     }
 
-    var child = std.process.Child.init(executable.items, alloc);
-    child.stdin = std.fs.File.stdin();
-    child.stdout = std.fs.File.stdout();
-    child.stderr = std.fs.File.stderr();
-    const term = child.spawnAndWait() catch return ExecError.VersionNotInstalled;
-    std.process.exit(term.Exited);
+    var child = try std.process.spawn(io, .{ .argv = executable.items });
+    const term = try child.wait(io);
+    std.process.exit(term.exited);
 }

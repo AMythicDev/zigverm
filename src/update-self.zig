@@ -18,23 +18,23 @@ const DownloadTarball = struct {
     url: []const u8,
     actual_size: usize,
 
-    file_handle: ?std.fs.File = null,
-    writer: ?std.fs.File.Writer = null,
+    file_handle: ?std.Io.File = null,
+    writer: ?std.Io.File.Writer = null,
     file_size: usize = 0,
 
     var buf: [4096]u8 = undefined;
 
     const Self = @This();
 
-    fn createDownloadFile(self: *Self, cp1: CommonPaths) !void {
-        self.file_handle = try cp1.download_dir.createFile(self.filename, .{ .read = true, .truncate = false });
-        self.writer = self.file_handle.?.writer(&buf);
-        self.file_size = @intCast(try self.file_handle.?.getEndPos());
+    fn createDownloadFile(self: *Self, io: Io, cp1: CommonPaths) !void {
+        self.file_handle = try cp1.download_dir.createFile(io, self.filename, .{ .read = true, .truncate = false });
+        self.writer = self.file_handle.?.writer(io, &buf);
+        self.file_size = @intCast(try self.file_handle.?.length(io));
     }
 
-    fn deinit(self: *Self) !void {
+    fn deinit(self: *Self, io: Io) !void {
         self.writer = null;
-        self.file_handle.?.close();
+        self.file_handle.?.close(io);
         self.file_handle = null;
     }
 };
@@ -68,14 +68,14 @@ pub fn update_self(alloc: Allocator, io: Io, cp: CommonPaths) !void {
         std.process.exit(1);
     };
 
-    try download_tarball.createDownloadFile(cp);
-    defer download_tarball.deinit() catch {};
+    try download_tarball.createDownloadFile(io, cp);
+    defer download_tarball.deinit(io) catch {};
     if (download_tarball.file_size < download_tarball.actual_size)
-        try install.download_tarball(alloc, io, &client, download_tarball.url, &download_tarball.writer.?, download_tarball.file_size, download_tarball.actual_size);
-    try download_tarball.file_handle.?.seekTo(0);
+        try install.downloadTarball(alloc, io, &client, download_tarball.url, &download_tarball.writer.?, download_tarball.file_size, download_tarball.actual_size);
 
     var buf: [4096]u8 = undefined;
     var src = download_tarball.file_handle.?.reader(io, &buf);
+    try src.seekTo(0);
 
     var zipfile = try ZipArchive.openFromFileReader(alloc, &src);
     defer zipfile.close();
@@ -83,31 +83,31 @@ pub fn update_self(alloc: Allocator, io: Io, cp: CommonPaths) !void {
     const zigverm_path = try std.mem.join(alloc, "", &.{ dl_filename, "/zigverm", if (builtin.os.tag == .windows) ".exe" else "" });
     const zig_path = try std.mem.join(alloc, "", &.{ dl_filename, "/zig", if (builtin.os.tag == .windows) ".exe" else "" });
 
-    try writeZipMember(zipfile, zigverm_path, cp);
-    try writeZipMember(zipfile, zig_path, cp);
+    try writeZipMember(io, zipfile, zigverm_path, cp);
+    try writeZipMember(io, zipfile, zig_path, cp);
 
     std.log.info("zigverm updated successfully", .{});
-    try cp.download_dir.deleteFile(full_dl_filename);
+    try cp.download_dir.deleteFile(io, full_dl_filename);
 }
 
-fn writeZipMember(zipfile: ZipArchive, path: []const u8, cp: CommonPaths) !void {
+fn writeZipMember(io: Io, zipfile: ZipArchive, path: []const u8, cp: CommonPaths) !void {
     const filename = std.fs.path.basename(path);
-    const bin_dir = try cp.zigverm_root.openDir("bin/", .{});
-    bin_dir.deleteFile(filename) catch |e| {
+    const bin_dir = try cp.zigverm_root.openDir(io, "bin/", .{});
+    bin_dir.deleteFile(io, filename) catch |e| {
         if (e != error.FileNotFound) return e;
     };
 
     var buf: [4096]u8 = undefined;
-    const file = try bin_dir.createFile(filename, .{ .truncate = true, .lock = .shared });
-    var file_writer = file.writer(&buf);
+    const file = try bin_dir.createFile(io, filename, .{ .truncate = true, .lock = .shared });
+    var file_writer = file.writer(io, &buf);
     const intf = &file_writer.interface;
-    defer file.close();
+    defer file.close(io);
 
     var entry = zipfile.getFileByName(path).?;
 
     try entry.decompressWriter(intf);
     if (builtin.os.tag != .windows) {
-        try file.chmod(0o755);
+        try file.setPermissions(io, std.Io.File.Permissions.fromMode(0o755));
     }
 }
 

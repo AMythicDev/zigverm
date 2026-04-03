@@ -23,15 +23,15 @@ pub fn main(init: std.process.Init) !void {
     const alloc = init.arena.allocator();
     const io = init.io;
 
-    const command = try Cli.read_args(alloc);
+    const command = try Cli.read_args(alloc, io, init.minimal.args);
 
-    var cp = try CommonPaths.resolve(alloc);
-    defer cp.close();
+    var cp = try CommonPaths.resolve(alloc, io, init.environ_map);
+    defer cp.close(io);
 
     switch (command) {
         Cli.install => |version| {
             var rel = try Release.releaseFromVersion(version);
-            if (cp.install_dir.openDir(try common.release_name(alloc, rel), .{})) |_| {
+            if (cp.install_dir.openDir(io, try common.release_name(alloc, rel), .{})) |_| {
                 std.log.err("Version already installled. Quitting", .{});
                 std.process.exit(0);
             } else |_| {}
@@ -46,7 +46,7 @@ pub fn main(init: std.process.Init) !void {
         },
         Cli.remove => |version| {
             const rel = try Release.releaseFromVersion(version);
-            try remove_release(alloc, rel, cp);
+            try remove_release(alloc, io, rel, cp);
         },
         Cli.show => try show_info(alloc, io, cp),
         Cli.std => |ver| try open_std(alloc, io, cp, ver),
@@ -55,13 +55,13 @@ pub fn main(init: std.process.Init) !void {
             var override_args = oa;
             const rel = try Release.releaseFromVersion(override_args.version);
             if (override_args.directory != null and !streql(override_args.directory.?, "default")) {
-                override_args.directory = try std.fs.realpathAlloc(alloc, override_args.directory.?);
+                override_args.directory = try std.Io.Dir.cwd().realPathFileAlloc(io, override_args.directory.?, alloc);
             }
-            const directory = override_args.directory orelse try std.process.getCwdAlloc(alloc);
+            const directory = override_args.directory orelse try std.process.currentPathAlloc(io, alloc);
             try override(alloc, io, cp, rel, directory);
         },
         Cli.override_rm => |dir| {
-            const directory = dir orelse try std.process.getCwdAlloc(alloc);
+            const directory = dir orelse try std.process.currentPathAlloc(io, alloc);
             try override_rm(alloc, io, cp, directory);
         },
         Cli.update_self => try update_self.update_self(alloc, io, cp),
@@ -69,10 +69,10 @@ pub fn main(init: std.process.Init) !void {
     }
 }
 
-fn remove_release(alloc: Allocator, rel: Release, cp: CommonPaths) !void {
+fn remove_release(alloc: Allocator, io: Io, rel: Release, cp: CommonPaths) !void {
     const release_dir = try common.release_name(alloc, rel);
-    if (cp.install_dir.openDir(release_dir, .{})) |_| {
-        try cp.install_dir.deleteTree(release_dir);
+    if (cp.install_dir.openDir(io, release_dir, .{})) |_| {
+        try cp.install_dir.deleteTree(io, release_dir);
         std.log.info("Removed {s}", .{release_dir});
     } else |_| {
         std.log.err("Version not installled. Quitting", .{});
@@ -85,7 +85,7 @@ fn open_std(alloc: Allocator, io: Io, cp: CommonPaths, ver: ?[]const u8) !void {
     if (ver) |v| {
         best_match = v;
     } else {
-        const dir_to_check = try std.process.getCwdAlloc(alloc);
+        const dir_to_check = try std.process.currentPathAlloc(io, alloc);
         var overrides = try common.overrides.read_overrides(alloc, io, cp);
         defer overrides.deinit();
 
@@ -102,9 +102,9 @@ fn open_std(alloc: Allocator, io: Io, cp: CommonPaths, ver: ?[]const u8) !void {
     var executable: std.ArrayListUnmanaged([]const u8) = .empty;
     try executable.append(alloc, zig_path);
     try executable.append(alloc, "std");
-    var child = std.process.Child.init(executable.items, alloc);
-    const term = try child.spawnAndWait();
-    std.process.exit(term.Exited);
+    var child = try std.process.spawn(io, .{ .argv = executable.items });
+    const term = try child.wait(io);
+    std.process.exit(term.exited);
 }
 
 fn open_reference(alloc: Allocator, io: Io, cp: CommonPaths, ver: ?[]const u8) !void {
@@ -112,7 +112,7 @@ fn open_reference(alloc: Allocator, io: Io, cp: CommonPaths, ver: ?[]const u8) !
     if (ver) |v| {
         best_match = v;
     } else {
-        const dir_to_check = try std.process.getCwdAlloc(alloc);
+        const dir_to_check = try std.process.currentPathAlloc(io, alloc);
         var overrides = try common.overrides.read_overrides(alloc, io, cp);
         defer overrides.deinit();
 
@@ -136,15 +136,15 @@ fn open_reference(alloc: Allocator, io: Io, cp: CommonPaths, ver: ?[]const u8) !
     var executable: std.ArrayListUnmanaged([]const u8) = .empty;
     try executable.append(alloc, main_exe);
     try executable.append(alloc, langref_path);
-    var child = std.process.Child.init(executable.items, alloc);
-    try child.spawn();
+
+    _ = try std.process.spawn(io, .{ .argv = executable.items });
 }
 
 fn show_info(alloc: Allocator, io: Io, cp: CommonPaths) !void {
     std.debug.print("zigverm root:\t{s}\n\n", .{CommonPaths.get_zigverm_root()});
     var iter = cp.install_dir.iterate();
 
-    const dir_to_check = try std.process.getCwdAlloc(alloc);
+    const dir_to_check = try std.process.currentPathAlloc(io, alloc);
     var overrides = try common.overrides.read_overrides(alloc, io, cp);
     defer overrides.deinit();
 
@@ -154,7 +154,7 @@ fn show_info(alloc: Allocator, io: Io, cp: CommonPaths) !void {
     std.debug.print("Installed releases:\n\n", .{});
 
     var n: u8 = 1;
-    while (try iter.next()) |i| {
+    while (try iter.next(io)) |i| {
         if (!utils.check_install_name(i.name)) {
             continue;
         }
@@ -171,12 +171,12 @@ fn override(alloc: Allocator, io: Io, cp: CommonPaths, rel: Release, directory: 
     if (streql(directory, "default"))
         actual_dir = try alloc.dupe(u8, "default")
     else if (directory.len == 0)
-        actual_dir = try std.process.getCwdAlloc(alloc)
+        actual_dir = try std.process.currentPathAlloc(io, alloc)
     else
-        actual_dir = try std.fs.realpathAlloc(alloc, directory);
+        actual_dir = try std.Io.Dir.cwd().realPathFileAlloc(io, directory, alloc);
 
     try overrides.addOverride(actual_dir, rel.releaseName());
-    try common.overrides.write_overrides(overrides, cp);
+    try common.overrides.write_overrides(io, overrides, cp);
 }
 
 fn override_rm(alloc: Allocator, io: Io, cp: CommonPaths, directory: []const u8) !void {
@@ -190,18 +190,18 @@ fn override_rm(alloc: Allocator, io: Io, cp: CommonPaths, directory: []const u8)
     if (streql(directory, "default"))
         actual_dir = try alloc.dupe(u8, "default")
     else if (directory.len == 0)
-        actual_dir = try std.process.getCwdAlloc(alloc)
+        actual_dir = try std.process.currentPathAlloc(io, alloc)
     else
-        actual_dir = try std.fs.realpathAlloc(alloc, directory);
+        actual_dir = try std.Io.Dir.cwd().realPathFileAlloc(io, directory, alloc);
 
     _ = overrides.backing_map.orderedRemove(directory);
-    try common.overrides.write_overrides(overrides, cp);
+    try common.overrides.write_overrides(io, overrides, cp);
 }
 
-fn installed_versions(alloc: Allocator, cp: CommonPaths) ![][]const u8 {
+fn installed_versions(io: Io, alloc: Allocator, cp: CommonPaths) ![][]const u8 {
     var iter = cp.install_dir.iterate();
     var versions: std.ArrayList([]const u8) = .empty;
-    while (try iter.next()) |i| {
+    while (try iter.next(io)) |i| {
         if (!utils.check_install_name(i.name)) continue;
         var components = std.mem.splitScalar(u8, i.name[4..], '-');
         _ = components.next();
@@ -212,7 +212,7 @@ fn installed_versions(alloc: Allocator, cp: CommonPaths) ![][]const u8 {
     return versions.items;
 }
 
-fn get_version_from_exe(alloc: Allocator, release_name: []const u8) !std.ArrayListUnmanaged(u8) {
+fn get_version_from_exe(io: Io, alloc: Allocator, release_name: []const u8) ![]u8 {
     var executable = [2][]const u8{ undefined, "version" };
     executable[0] = try std.fs.path.join(alloc, &.{
         common.paths.CommonPaths.get_zigverm_root(),
@@ -220,24 +220,20 @@ fn get_version_from_exe(alloc: Allocator, release_name: []const u8) !std.ArrayLi
         release_name,
         "zig",
     });
-    var version: std.ArrayListUnmanaged(u8) = .empty;
-    var stderr: std.ArrayListUnmanaged(u8) = .empty;
-    var child = std.process.Child.init(&executable, alloc);
-    child.stdout_behavior = .Pipe;
-    child.stderr_behavior = .Pipe;
-    try child.spawn();
-    try child.collectOutput(alloc, &version, &stderr, 256);
-    _ = try child.wait();
-    _ = version.pop();
+    var version = try alloc.alloc(u8, 32);
 
-    return version;
+    var child = try std.process.spawn(io, .{ .argv = &executable, .stderr = .pipe, .stdout = .pipe });
+    _ = try child.wait(io);
+    const n = try child.stderr.?.readPositionalAll(io, version, 0);
+
+    return version[0 .. n - 1];
 }
 
 fn update_zig_installation(alloc: Allocator, io: Io, cp: CommonPaths, version_possible: ?[]const u8) !void {
     var versions: [][]const u8 = undefined;
     if (version_possible) |v| {
         versions = @constCast(&[1][]const u8{v});
-    } else versions = try installed_versions(alloc, cp);
+    } else versions = try installed_versions(io, alloc, cp);
 
     var updated_now: std.ArrayList([]const u8) = .empty;
     var already_update: std.ArrayList([]const u8) = .empty;
@@ -249,19 +245,19 @@ fn update_zig_installation(alloc: Allocator, io: Io, cp: CommonPaths, version_po
     for (versions) |v| {
         var rel = try Release.releaseFromVersion(v);
         const release_name = try common.release_name(alloc, rel);
-        if (cp.install_dir.openDir(release_name, .{})) |_| {
+        if (cp.install_dir.openDir(io, release_name, .{})) |_| {
             var to_update = false;
             if (rel.spec == common.ReleaseSpec.FullVersionSpec) {
                 to_update = false;
             } else if (rel.spec == common.ReleaseSpec.Master) {
-                const zig_version = try std.SemanticVersion.parse((try get_version_from_exe(alloc, release_name)).items);
+                const zig_version = try std.SemanticVersion.parse((try get_version_from_exe(io, alloc, release_name)));
                 var next_master_release = try Release.releaseFromVersion("master");
                 try next_master_release.resolve(releases);
                 if (zig_version.order(next_master_release.actual_version.?) != std.math.Order.eq) {
                     to_update = true;
                 }
             } else if (rel.spec == common.ReleaseSpec.Stable) {
-                const zig_version = try std.SemanticVersion.parse((try get_version_from_exe(alloc, release_name)).items);
+                const zig_version = try std.SemanticVersion.parse((try get_version_from_exe(io, alloc, release_name)));
                 var next_stable_release = try Release.releaseFromVersion("stable");
                 try next_stable_release.resolve(releases);
 
@@ -269,7 +265,7 @@ fn update_zig_installation(alloc: Allocator, io: Io, cp: CommonPaths, version_po
                     to_update = true;
                 }
             } else {
-                var zig_version = try std.SemanticVersion.parse((try get_version_from_exe(alloc, release_name)).items);
+                var zig_version = try std.SemanticVersion.parse((try get_version_from_exe(io, alloc, release_name)));
                 var format_buf: [32]u8 = undefined;
                 var format_buf_stream = std.Io.Writer.fixed(&format_buf);
                 zig_version.patch += 1;

@@ -63,8 +63,8 @@ pub fn read_overrides(alloc: Allocator, io: Io, cp: CommonPaths) !OverrideMap {
     // error. Instead if the file is empty, we create StringArrayHashMap to hold our overrides.
     // Typically we would prefer the pread() function but its currently broken for Windows, hence we do hacky method
     // by checking if there bytes can be read and then resetting the file cursor back to 0.
-    if (try cp.overrides.getEndPos() != 0) {
-        try cp.overrides.seekTo(0);
+    if (try cp.overrides.length(io) != 0) {
+        try file_bufreader.seekTo(0);
         var json_reader = json.Reader.init(alloc, file_reader);
         const parsed = try json.parseFromTokenSource(json.Value, alloc, &json_reader, .{});
         defer {
@@ -82,17 +82,17 @@ pub fn read_overrides(alloc: Allocator, io: Io, cp: CommonPaths) !OverrideMap {
     return overrides;
 }
 
-pub fn write_overrides(overrides: OverrideMap, cp: CommonPaths) !void {
+pub fn write_overrides(io: Io, overrides: OverrideMap, cp: CommonPaths) !void {
     // NOTE: VERY IMPORTANT LINE FOR NOT SPAGHETTIFYING THE WHOLE FILE:
     // What we are effectively trying to do is truncate the file to zero length. For that we use the `setEndPos`
     // function. `setEndPos` resizes the file based on the current file cursor postion. It is sure that the file cursor
     // will be at the end of the file after all the above reading, hence we reset the cursor back to 0 so that there
     // isn't any weird byte writings at the beginning of the file.
-    try cp.overrides.seekTo(0);
-    try cp.overrides.setEndPos(0);
     var buf: [4096]u8 = undefined;
-    var file_writer = cp.overrides.writer(&buf);
+    var file_writer = cp.overrides.writer(io, &buf);
     const intf = &file_writer.interface;
+    try cp.overrides.setLength(io, 0);
+    try file_writer.seekTo(0);
 
     try json.Stringify.value(json.Value{ .object = overrides.backing_map }, .{ .whitespace = .indent_2 }, intf);
     _ = try intf.write("\n");

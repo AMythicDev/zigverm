@@ -14,7 +14,7 @@ const Sha256 = std.crypto.hash.sha2.Sha256;
 const release_name = common.release_name;
 const AtomicOrder = std.builtin.AtomicOrder;
 const time = std.time;
-const File = std.fs.File;
+const File = std.Io.File;
 const Io = std.Io;
 
 const default_os = builtin.target.os.tag;
@@ -43,33 +43,33 @@ pub fn install_release(alloc: Allocator, io: Io, client: *Client, releases: json
     const tarball_dw_filename = try dw_tarball_name(alloc, rel.*);
 
     var tarball = try get_correct_tarball(alloc, io, client, tarball_dw_filename, tarball_url, total_size, shasum, cp, 0);
-    defer tarball.close();
+    defer tarball.close(io);
 
     var buf: [4096]u8 = undefined;
     var tarball_reader = tarball.reader(io, &buf);
     const tbl_intf = &tarball_reader.interface;
 
     std.log.info("Extracting {s}", .{tarball_dw_filename});
-    try cp.install_dir.deleteTree(try release_name(alloc, rel.*));
-    try extract_xz(alloc, cp, rel.*, tbl_intf);
+    try cp.install_dir.deleteTree(io, try release_name(alloc, rel.*));
+    try extract_xz(alloc, io, cp, rel.*, tbl_intf);
 
-    try cp.download_dir.deleteFile(tarball_dw_filename);
+    try cp.download_dir.deleteFile(io, tarball_dw_filename);
 }
 
-fn get_correct_tarball(alloc: Allocator, io: Io, client: *Client, tarball_dw_filename: []const u8, tarball_url: []const u8, total_size: usize, shasum: *const [64]u8, cp: CommonPaths, tries: u8) !std.fs.File {
+fn get_correct_tarball(alloc: Allocator, io: Io, client: *Client, tarball_dw_filename: []const u8, tarball_url: []const u8, total_size: usize, shasum: *const [64]u8, cp: CommonPaths, tries: u8) !File {
     const force_redownload = tries > 0;
     // IMPORTANT: To continue downloading if the file isn't completely downloaded AKA partial downloading, we
     // open the file with .truncate = false and then later move the file cursor to the end of the file using seekFromEnd().
     // This is basically Zig's equivalent to *open in append mode*.
-    var tarball = try cp.download_dir.createFile(tarball_dw_filename, .{ .read = true, .truncate = force_redownload });
-    const tarball_size = if (force_redownload) 0 else try tarball.getEndPos();
+    var tarball = try cp.download_dir.createFile(io, tarball_dw_filename, .{ .read = true, .truncate = force_redownload });
+    const tarball_size = if (force_redownload) 0 else try tarball.length(io);
 
     var buf: [4096]u8 = undefined;
 
     if (tarball_size < total_size or force_redownload) {
-        try tarball.seekTo(tarball_size);
-        var tarball_writer = tarball.writer(&buf);
-        try download_tarball(
+        var tarball_writer = tarball.writer(io, &buf);
+        try tarball_writer.seekTo(tarball_size);
+        try downloadTarball(
             alloc,
             io,
             client,
@@ -78,7 +78,7 @@ fn get_correct_tarball(alloc: Allocator, io: Io, client: *Client, tarball_dw_fil
             tarball_size,
             total_size,
         );
-        try tarball.seekTo(0);
+        try tarball_writer.seekTo(0);
     } else {
         std.log.info("Found already existing tarball, using that", .{});
     }
@@ -96,11 +96,11 @@ fn get_correct_tarball(alloc: Allocator, io: Io, client: *Client, tarball_dw_fil
             return error.BadChecksum;
         }
     }
-    try tarball.seekTo(0);
+    try tarball_reader.seekTo(0);
     return tarball;
 }
 
-pub fn download_tarball(alloc: Allocator, io: Io, client: *Client, tb_url: []const u8, tb_writer: *std.fs.File.Writer, tarball_size: u64, total_size: usize) !void {
+pub fn downloadTarball(alloc: Allocator, io: Io, client: *Client, tb_url: []const u8, tb_writer: *File.Writer, tarball_size: u64, total_size: usize) !void {
     std.log.info("Downloading {s}", .{tb_url});
     const tarball_uri = try std.Uri.parse(tb_url);
 
@@ -147,12 +147,14 @@ pub fn download_tarball(alloc: Allocator, io: Io, client: *Client, tb_url: []con
 }
 
 pub fn download_progress_bar(io: Io, dlnow: *std.atomic.Value(f32), tarball_size: f64, total_size: f64) !void {
-    const stderr = std.fs.File.stderr();
-    var stderrw = std.fs.File.Writer.init(stderr, &.{});
+    const stderr = File.stderr();
+    var stderrw = stderr.writer(io, &.{});
     const stderr_writer = &stderrw.interface;
     var progress_bar: [150]u8 = ("░" ** 50).*;
     var bars: u8 = 0;
-    var timer = try time.Timer.start();
+    const clock = std.Io.Clock.real;
+    const start = clock.now(io);
+
     var downloaded = dlnow.load(AtomicOrder.monotonic);
 
     while (true) {
@@ -162,7 +164,8 @@ pub fn download_progress_bar(io: Io, dlnow: *std.atomic.Value(f32), tarball_size
             std.mem.copyForwards(u8, progress_bar[i * 3 .. i * 3 + 3], "█");
         }
         bars = newbars;
-        const speed = downloaded / 1024 / @as(f64, @floatFromInt(timer.read() / time.ns_per_s));
+        const time_passed: f64 = @floatFromInt(start.untilNow(io, clock).toSeconds());
+        const speed = downloaded / 1024 / time_passed;
         try stderr_writer.print("\x1b[G\x1b[0K\t\x1b[33m{s}\x1b[0m{s} {d}% {d:.1}KB/s", .{ progress_bar[0 .. newbars * 3], progress_bar[newbars * 3 ..], pcnt_complete, speed });
 
         if (downloaded + tarball_size >= total_size) break;
@@ -231,14 +234,14 @@ pub fn check_hash(hashstr: *const [64]u8, reader: *std.Io.Reader) !bool {
     return std.mem.eql(u8, &hasher.finalResult(), &hash);
 }
 
-inline fn extract_xz(alloc: Allocator, dirs: CommonPaths, rel: Release, reader: *std.Io.Reader) !void {
+inline fn extract_xz(alloc: Allocator, io: Io, dirs: CommonPaths, rel: Release, reader: *std.Io.Reader) !void {
     // HACK: Use the older interface until Zig upgrades this
     const buff = try alloc.alloc(u8, 4096);
     var xz = try std.compress.xz.Decompress.init(reader, alloc, buff);
     defer alloc.free(xz.takeBuffer());
-    const release_dir = try dirs.install_dir.makeOpenPath(try release_name(alloc, rel), .{});
+    const release_dir = try dirs.install_dir.createDirPathOpen(io, try release_name(alloc, rel), .{});
     const intf = &xz.reader;
-    try std.tar.pipeToFileSystem(release_dir, intf, .{ .strip_components = 1 });
+    try std.tar.pipeToFileSystem(io, release_dir, intf, .{ .strip_components = 1 });
 }
 
 pub fn target_name() []const u8 {

@@ -15,53 +15,48 @@ const DownloadTarball = struct {
     filename: []const u8,
     url: []const u8,
     actual_size: usize,
-    file_handle: ?std.fs.File = null,
-    writer: ?std.fs.File.Writer = null,
+    file_handle: ?std.Io.File = null,
+    writer: ?std.Io.File.Writer = null,
     file_size: usize = 0,
     var buf: [4096]u8 = undefined;
 
     const Self = @This();
 
-    fn createDownloadFile(self: *Self, download_dir: std.fs.Dir) !void {
-        self.file_handle = try download_dir.createFile(self.filename, .{ .read = true, .truncate = false });
-        self.writer = self.file_handle.?.writer(&buf);
-        self.file_size = @intCast(try self.file_handle.?.getEndPos());
+    fn createDownloadFile(self: *Self, io: Io, download_dir: std.Io.Dir) !void {
+        self.file_handle = try download_dir.createFile(io, self.filename, .{ .read = true, .truncate = false });
+        self.writer = self.file_handle.?.writer(io, &buf);
+        self.file_size = @intCast(try self.file_handle.?.length(io));
     }
 
-    fn deinit(self: *Self) !void {
+    fn deinit(self: *Self, io: Io) !void {
         self.writer = null;
-        if (self.file_handle) |f| f.close();
+        if (self.file_handle) |f| f.close(io);
         self.file_handle = null;
     }
 };
 
 pub fn main(init: std.process.Init) !void {
     const io = init.io;
+    const allocator = init.arena.allocator();
 
-    const zigverm_dir_path = std.process.getEnvVarOwned(allocator, "ZIGVERM_ROOT_DIR") catch |e1| blk: {
-        if (e1 == error.EnvironmentVariableNotFound) {
-            const env_var = if (builtin.os.tag == .windows) "USERPROFILE" else "HOME";
-            const home_dir = std.process.getEnvVarOwned(allocator, env_var) catch |e2| {
-                if (e2 != error.EnvironmentVariableNotFound) {
-                    std.log.err("failed to determine home dir for current user", .{});
-                    return {};
-                } else {
-                    return e2;
-                }
-            };
-            break :blk try path.join(allocator, &.{ home_dir, ".zigverm" });
-        } else return e1;
+    const zigverm_dir_path = init.environ_map.get("ZIGVERM_ROOT_DIR") orelse blk: {
+        const env_var = if (builtin.os.tag == .windows) "USERPROFILE" else "HOME";
+        const home_dir = init.environ_map.get(env_var) orelse {
+            std.log.err("failed to determine home dir for current user", .{});
+            return {};
+        };
+        break :blk try path.join(allocator, &.{ home_dir, ".zigverm" });
     };
 
-    std.fs.makeDirAbsolute(zigverm_dir_path) catch |e| if (e != error.PathAlreadyExists) return e;
+    std.Io.Dir.createDirAbsolute(io, zigverm_dir_path, .default_dir) catch |e| if (e != error.PathAlreadyExists) return e;
 
-    var zigverm_dir = try std.fs.openDirAbsolute(zigverm_dir_path, .{});
-    defer zigverm_dir.close();
+    var zigverm_dir = try std.Io.Dir.openDirAbsolute(io, zigverm_dir_path, .{});
+    defer zigverm_dir.close(io);
 
     const DIRS_TO_CREATE = [3][]const u8{ "bin", "installs", "downloads" };
 
     for (DIRS_TO_CREATE) |dir| {
-        zigverm_dir.makeDir(dir) catch |e| if (e != error.PathAlreadyExists) return e;
+        zigverm_dir.createDir(io, dir, .default_dir) catch |e| if (e != error.PathAlreadyExists) return e;
     }
 
     // Fetch and Install Logic
@@ -92,50 +87,47 @@ pub fn main(init: std.process.Init) !void {
         return;
     };
 
-    var download_dir = try zigverm_dir.openDir("downloads", .{});
-    defer download_dir.close();
+    var download_dir = try zigverm_dir.openDir(io, "downloads", .{});
+    defer download_dir.close(io);
 
-    try tarball.createDownloadFile(download_dir);
-    defer tarball.deinit() catch {};
+    try tarball.createDownloadFile(io, download_dir);
+    defer tarball.deinit(io) catch {};
 
     if (tarball.file_size < tarball.actual_size)
         try download_tarball(allocator, &client, io, tarball.url, &tarball.writer.?, tarball.file_size, tarball.actual_size);
 
-    try tarball.file_handle.?.seekTo(0);
-
     var buf: [4096]u8 = undefined;
     var src = tarball.file_handle.?.reader(io, &buf);
+    try src.seekTo(0);
 
     var zipfile = try ZipArchive.openFromFileReader(allocator, &src);
     defer zipfile.close();
 
-    var bin_dir = try zigverm_dir.openDir("bin", .{});
-    defer bin_dir.close();
+    var bin_dir = try zigverm_dir.openDir(io, "bin", .{});
+    defer bin_dir.close(io);
 
     const zigverm_path = try std.mem.join(allocator, "/", &.{ dl_filename, "zigverm.exe" });
     const zig_path = try std.mem.join(allocator, "/", &.{ dl_filename, "zig.exe" });
 
-    try writeFilesFromZip(bin_dir, zipfile, zigverm_path);
-    try writeFilesFromZip(bin_dir, zipfile, zig_path);
+    try writeFilesFromZip(io, bin_dir, zipfile, zigverm_path);
+    try writeFilesFromZip(io, bin_dir, zipfile, zig_path);
 
     std.log.info("Installed zigverm successfully", .{});
 
     std.log.info("Installing latest stable zig version...", .{});
     const installed_binary = try path.join(allocator, &.{ zigverm_dir_path, "bin", "zigverm.exe" });
-    var child = std.process.Child.init(&.{ installed_binary, "install", "stable" }, allocator);
-    child.stdin = std.fs.File.stdin();
-    child.stdout = std.fs.File.stdout();
-    child.stderr = std.fs.File.stderr();
-    _ = try child.spawnAndWait();
+
+    var child = try std.process.spawn(io, .{ .argv = &.{ installed_binary, "install", "stable" } });
+    _ = try child.wait(io);
 }
 
-fn writeFilesFromZip(bin_dir: std.fs.Dir, zipFile: ZipArchive, filename: []const u8) !void {
+fn writeFilesFromZip(io: Io, bin_dir: std.Io.Dir, zipFile: ZipArchive, filename: []const u8) !void {
     const entry = zipFile.getFileByName(filename) orelse unreachable;
-    const out_filename = std.fs.path.basename(filename);
-    var file = try bin_dir.createFile(out_filename, .{ .truncate = true });
-    var fwriter = file.writer(&.{});
+    const out_filename = path.basename(filename);
+    var file = try bin_dir.createFile(io, out_filename, .{ .truncate = true });
+    var fwriter = file.writer(io, &.{});
     const writer = &fwriter.interface;
-    defer file.close();
+    defer file.close(io);
     var entry_ptr = @constCast(&entry);
     try entry_ptr.decompressWriter(writer);
 }
@@ -145,7 +137,7 @@ fn download_tarball(
     client: *Client,
     io: Io,
     tb_url: []const u8,
-    tb_writer: *std.fs.File.Writer,
+    tb_writer: *std.Io.File.Writer,
     tarball_size: u64,
     total_size: usize,
 ) !void {
@@ -231,12 +223,15 @@ fn read_github_releases_data(alloc: std.mem.Allocator, io: Io, client: *Client) 
 }
 
 pub fn download_progress_bar(io: Io, dlnow: *std.atomic.Value(f32), tarball_size: f64, total_size: f64) !void {
-    const stderr = std.fs.File.stderr();
-    var stderrw = std.fs.File.Writer.init(stderr, &.{});
+    const stderr = std.Io.File.stderr();
+    var stderrw = std.Io.File.Writer.init(stderr, io, &.{});
     const stderr_writer = &stderrw.interface;
     var progress_bar: [150]u8 = ("░" ** 50).*;
     var bars: u8 = 0;
-    var timer = try time.Timer.start();
+
+    const clock = std.Io.Clock.real;
+    const start = clock.now(io);
+
     var downloaded = dlnow.load(AtomicOrder.monotonic);
 
     while (true) {
@@ -246,7 +241,8 @@ pub fn download_progress_bar(io: Io, dlnow: *std.atomic.Value(f32), tarball_size
             std.mem.copyForwards(u8, progress_bar[i * 3 .. i * 3 + 3], "█");
         }
         bars = newbars;
-        const speed = downloaded / 1024 / @as(f64, @floatFromInt(timer.read() / time.ns_per_s));
+        const time_passed: f64 = @floatFromInt(start.untilNow(io, clock).toSeconds());
+        const speed = downloaded / 1024 / time_passed;
         try stderr_writer.print("\x1b[G\x1b[0K\t\x1b[33m{s}\x1b[0m{s} {d}% {d:.1}KB/s", .{ progress_bar[0 .. newbars * 3], progress_bar[newbars * 3 ..], pcnt_complete, speed });
 
         if (downloaded + tarball_size >= total_size) break;

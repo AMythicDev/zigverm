@@ -52,10 +52,8 @@ pub const Cli = union(enum) {
     std: ?[]const u8,
     reference: ?[]const u8,
 
-    pub fn read_args(alloc: Allocator) anyerror!Cli {
-        var arg_iter = try std.process.argsWithAllocator(alloc);
-        defer arg_iter.deinit();
-
+    pub fn read_args(alloc: Allocator, io: std.Io, args: std.process.Args) anyerror!Cli {
+        var arg_iter = args.iterate();
         _ = arg_iter.next();
 
         var command: Cli = undefined;
@@ -88,10 +86,10 @@ pub const Cli = union(enum) {
         } else if (streql(cmd, "info")) {
             command = Cli.show;
         } else if (streql(cmd, "-h") or streql(cmd, "--help")) {
-            try utils.printStdOut("{s}\n", .{helptext});
+            try utils.printStdOut(io, "{s}\n", .{helptext});
             std.process.exit(0);
         } else if (streql(cmd, "-V") or streql(cmd, "--version")) {
-            try utils.printStdOut("{s}\n", .{Version});
+            try utils.printStdOut(io, "{s}\n", .{Version});
             std.process.exit(0);
         } else if (streql(cmd, "update-self")) {
             command = Cli.update_self;
