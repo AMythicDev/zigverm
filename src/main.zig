@@ -17,11 +17,10 @@ const Release = common.Release;
 const install = @import("install.zig");
 const Io = std.Io;
 
-pub const Version: []const u8 = @import("build.zig.zon").version;
+pub const Version: []const u8 = @import("build_zig_zon").version;
 
 pub fn main(init: std.process.Init) !void {
-    var aa = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    const alloc = init.arena.allocator()
+    const alloc = init.arena.allocator();
     const io = init.io;
 
     const command = try Cli.read_args(alloc);
