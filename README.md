@@ -57,7 +57,7 @@ shell supported is listed below:
 ### Compiling
 
 Requirements:
-- Zig master
+- zigverm can only be compiled with Zig master for now, until Zig v0.16 is released.
 - libc on non-Windows systems. Can be provided by Zig itself, if available for the platform.
 - `git`, if you want to compile the latest commit or you want to develop `zigverm`.
 
@@ -89,7 +89,7 @@ zig build --release=safe
 
 ## Docs
 
-Read the [quick guide](./docs/quick-guide.md)
+Read the [User Guide](./docs/user-guide.md)
 
 ## License
 
