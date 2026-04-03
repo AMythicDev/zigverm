@@ -60,11 +60,11 @@ pub fn home_dir(alloc: Allocator, environ_map: *Environ.Map) ![]const u8 {
     const env_var = if (default_os == .windows) "USERPROFILE" else "HOME";
     return environ_map.get(env_var) orelse {
         if (default_os == OsTag.windows) {
-            const homedrive = environ_map.get(alloc, "HOMEDRIVE") orelse {
+            const homedrive = environ_map.get("HOMEDRIVE") orelse {
                 std.log.err("failed to determine home dir for current user", .{});
                 return {};
             };
-            const homepath = try std.process.getEnvVarOwned(alloc, "HOMEPATH") orelse {
+            const homepath = try environ_map.get("HOMEPATH") orelse {
                 std.log.err("failed to determine home dir for current user", .{});
                 return {};
             };
