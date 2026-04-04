@@ -2,6 +2,15 @@
 
 This file documents all changes made to the project and is updated before each release.
 
+## v0.8.1 [2026-04-04]
+- Upgrade to zip.zig v0.3.7
+
+## v0.8.0 [2026-04-04]
+### Fixed
+- Refactor codebase to sync with latest Zig master.
+- Windows installer should now be usable.
+- Upgrade to zip.zig v0.3.6
+
 ## v0.7.3 [2025-12-16]
 ### Fixed
 - update-self command was writing partial binary files due to writer not flushing by zip.zig
