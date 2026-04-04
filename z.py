@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import shutil
 import sys
 import subprocess
 import os
@@ -75,6 +76,10 @@ def make_target_release(target: str, version: str):
             )
             z.write("LICENSE", target_dir + "/LICENSE")
             z.write("README.md", target_dir + "/README")
+
+        if target[1] == "windows":
+            shutil.copy2("releases/" + target_dir + "/zigverm-setup.exe", f"releases/zigverm-setup-{target[0]}-windows.exe");
+
     except subprocess.CalledProcessError as e:
         eprint(
             "\n\n====================================================================================================="

@@ -40,19 +40,8 @@ shell supported is listed below:
 - Fish: `$XDG_CONFIG_HOME/fish/config.fish`, if not set then uses `$HOME/.config/fish/config.fish`
 
 ### For Windows
-
-- Create the following folder structure in `C:\Users\[YOU-USERNAME]\.zigverm`:
-
-```
-.
-├── bin
-├── downloads
-└── installs
-```
-
-- Download the latest release for Windows from GitHub and extract it.
-- Copy `zigverm.exe` and `zig.exe` to the `bin/` folder.
-- Add the `bin` directory to your `PATH` enviroment variable
+Download the automatic installer from the [Releases](https://github.com/AMythicDev/zigverm/releases) page and run it in Windows PowerShell.
+Similar to Linux/MacOS, the `ZIGVERM_ROOT_DIR` enviroment variable can be set before running the automatic installer to set the zigverm install location.
 
 ### Compiling
 
@@ -73,8 +62,16 @@ zig build --release=safe
 ```
 
 - If you are devloping `zigverm`, you can omit the `--release=safe` flag.
-- You will have `zigverm` and `zig` in `zig-out/bin/` directory
-- Lastly follow the same steps [for windows](#for-windows)
+- You will have `zigverm` and `zig` in `zig-out/bin/` directory.
+- Create the following folder structure in `~/.zigverm/`
+```
+.
+├── bin
+├── downloads
+└── installs
+```
+- Copy `zigverm` and `zig` binaries to the `bin/` folder.
+- Add the `bin/` directory to your PATH enviroment variable.
 
 ## Features
 
