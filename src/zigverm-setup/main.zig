@@ -26,6 +26,7 @@ const DownloadTarball = struct {
         self.file_handle = try download_dir.createFile(io, self.filename, .{ .read = true, .truncate = false });
         self.writer = self.file_handle.?.writer(io, &buf);
         self.file_size = @intCast(try self.file_handle.?.length(io));
+        self.writer.?.pos = self.file_size;
     }
 
     fn deinit(self: *Self, io: Io) !void {
@@ -175,7 +176,7 @@ fn download_tarball(
     const tbw_intf = &tb_writer.interface;
     while (tarball_size_d + dlnow.load(AtomicOrder.monotonic) <= total_size_d) {
         const len = try reader.readSliceShort(&buff);
-        _ = try tbw_intf.write(buff[0..len]);
+        try tbw_intf.writeAll(buff[0..len]);
         _ = dlnow.fetchAdd(@floatFromInt(len), AtomicOrder.monotonic);
 
         if (len < buff.len) {
