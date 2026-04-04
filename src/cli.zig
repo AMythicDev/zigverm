@@ -53,7 +53,8 @@ pub const Cli = union(enum) {
     reference: ?[]const u8,
 
     pub fn read_args(alloc: Allocator, io: std.Io, args: std.process.Args) anyerror!Cli {
-        var arg_iter = args.iterate();
+        var arg_iter = try args.iterateAllocator(alloc);
+        defer arg_iter.deinit();
         _ = arg_iter.next();
 
         var command: Cli = undefined;

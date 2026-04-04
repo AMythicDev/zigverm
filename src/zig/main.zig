@@ -11,7 +11,7 @@ pub fn main(init: std.process.Init) !void {
 
     var version: ?[]const u8 = null;
     var version_specified = false;
-    var args_iter = init.minimal.args.iterate();
+    var args_iter = try init.minimal.args.iterateAllocator(alloc);
     _ = args_iter.next();
 
     const next_arg = args_iter.next();

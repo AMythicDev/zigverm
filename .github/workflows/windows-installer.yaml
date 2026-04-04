@@ -1,0 +1,18 @@
+name: windows-installer
+on:
+  push:
+    paths:
+      - "src/zigverm-setup/main.zig"
+    tags:
+      - "*"
+  pull_request:
+
+jobs:
+  install-on-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: master
+      - run: zig build run-zigverm-setup

@@ -26,6 +26,7 @@ const DownloadTarball = struct {
         self.file_handle = try download_dir.createFile(io, self.filename, .{ .read = true, .truncate = false });
         self.writer = self.file_handle.?.writer(io, &buf);
         self.file_size = @intCast(try self.file_handle.?.length(io));
+        self.writer.?.pos = self.file_size;
     }
 
     fn deinit(self: *Self, io: Io) !void {
@@ -177,21 +178,16 @@ fn download_tarball(
 
     var buff: [1024]u8 = undefined;
 
-    // Convert everything into f64 for less typing in calculating % download and download speed
-    var dlnow = std.atomic.Value(f32).init(0);
-    const total_size_d: f64 = @floatFromInt(total_size);
-    const tarball_size_d: f64 = @floatFromInt(tarball_size);
+    var dlnow = std.atomic.Value(usize).init(0);
+    const tarball_size_u: usize = @intCast(active_tarball_size);
 
-    const progress_thread = try std.Thread.spawn(.{}, download_progress_bar, .{ io, &dlnow, tarball_size_d, total_size_d });
+    const progress_thread = try std.Thread.spawn(.{}, download_progress_bar, .{ io, &dlnow, tarball_size_u, total_size });
     const tbw_intf = &tb_writer.interface;
-    while (tarball_size_d + dlnow.load(AtomicOrder.monotonic) <= total_size_d) {
+    while (true) {
         const len = try reader.readSliceShort(&buff);
-        _ = try tbw_intf.write(buff[0..len]);
-        _ = dlnow.fetchAdd(@floatFromInt(len), AtomicOrder.monotonic);
-
-        if (len < buff.len) {
-            break;
-        }
+        try tbw_intf.writeAll(buff[0..len]);
+        _ = dlnow.fetchAdd(len, AtomicOrder.monotonic);
+        if (len < buff.len) break;
     }
     progress_thread.join();
     try tb_writer.end();
@@ -233,7 +229,7 @@ fn read_github_releases_data(alloc: std.mem.Allocator, io: Io, client: *Client) 
     return try json.parseFromTokenSource(json.Value, alloc, &json_reader, .{});
 }
 
-pub fn download_progress_bar(io: Io, dlnow: *std.atomic.Value(f32), tarball_size: f64, total_size: f64) !void {
+pub fn download_progress_bar(io: Io, dlnow: *std.atomic.Value(usize), tarball_size: usize, total_size: usize) !void {
     const stderr = std.Io.File.stderr();
     var stderrw = std.Io.File.Writer.init(stderr, io, &.{});
     const stderr_writer = &stderrw.interface;
@@ -246,14 +242,14 @@ pub fn download_progress_bar(io: Io, dlnow: *std.atomic.Value(f32), tarball_size
     var downloaded = dlnow.load(AtomicOrder.monotonic);
 
     while (true) {
-        const pcnt_complete: u8 = @intFromFloat((downloaded + tarball_size) * 100 / total_size);
+        const pcnt_complete: u8 = @intCast((downloaded + tarball_size) * 100 / total_size);
         const newbars: u8 = pcnt_complete / 2;
         for (bars..newbars) |i| {
             std.mem.copyForwards(u8, progress_bar[i * 3 .. i * 3 + 3], "█");
         }
         bars = newbars;
         const time_passed: f64 = @floatFromInt(start.untilNow(io, clock).toSeconds());
-        const speed = downloaded / 1024 / time_passed;
+        const speed = @as(f64, @floatFromInt(downloaded)) / 1024.0 / time_passed;
         try stderr_writer.print("\x1b[G\x1b[0K\t\x1b[33m{s}\x1b[0m{s} {d}% {d:.1}KB/s", .{ progress_bar[0 .. newbars * 3], progress_bar[newbars * 3 ..], pcnt_complete, speed });
 
         if (downloaded + tarball_size >= total_size) break;
