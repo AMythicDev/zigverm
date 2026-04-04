@@ -107,7 +107,7 @@ pub fn downloadTarball(alloc: Allocator, io: Io, client: *Client, tb_url: []cons
     var req = make_request(client, io, tarball_uri);
     defer req.?.deinit();
     if (req == null) {
-        std.log.err("Failed fetching the install tarball. Exitting (1)...", .{});
+        std.log.err("Failed fetching the install tarball. Exiting (1)...", .{});
         std.process.exit(1);
     }
 
@@ -121,6 +121,17 @@ pub fn downloadTarball(alloc: Allocator, io: Io, client: *Client, tb_url: []cons
     try req.?.sendBodiless();
     var redir_buf: [1024]u8 = undefined;
     var response = try req.?.receiveHead(&redir_buf);
+
+    if (response.head.status.class() != .success) {
+        std.log.err("HTTP error: {s} ({d})", .{ response.head.reason, @intFromEnum(response.head.status) });
+        return error.HttpError;
+    }
+
+    var active_tarball_size = tarball_size;
+    if (tarball_size > 0 and response.head.status != .partial_content) {
+        active_tarball_size = 0;
+        try tb_writer.seekTo(0);
+    }
 
     var reader = response.reader(&.{});
 
@@ -183,7 +194,7 @@ pub fn get_json_dslist(io: Io, client: *Client) anyerror!JsonResponse {
     var req = make_request(client, io, uri);
     defer req.?.deinit();
     if (req == null) {
-        std.log.err("Failed fetching the index. Exitting (1)...", .{});
+        std.log.err("Failed fetching the index. Exiting (1)...", .{});
         std.process.exit(1);
     }
 

@@ -117,7 +117,7 @@ fn read_github_releases_data(alloc: Allocator, io: Io, client: *Client) !json.Pa
     defer req.?.deinit();
 
     if (req == null) {
-        std.log.err("Failed fetching the install tarball. Exitting (1)...", .{});
+        std.log.err("Failed fetching the install tarball. Exiting (1)...", .{});
         std.process.exit(1);
     }
     req.?.extra_headers = &.{ http.Header{ .name = "Accept", .value = "application/vnd.github+json" }, http.Header{ .name = "X-GitHub-Api-Version", .value = "2022-11-28" } };
