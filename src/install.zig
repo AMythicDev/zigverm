@@ -10,6 +10,7 @@ const Release = common.Release;
 const paths = common.paths;
 const CommonPaths = paths.CommonPaths;
 const http = std.http;
+const ZipArchive = @import("zip").read.ZipArchive;
 const Sha256 = std.crypto.hash.sha2.Sha256;
 const release_name = common.release_name;
 const AtomicOrder = std.builtin.AtomicOrder;
@@ -51,7 +52,11 @@ pub fn install_release(alloc: Allocator, io: Io, client: *Client, releases: json
 
     std.log.info("Extracting {s}", .{tarball_dw_filename});
     try cp.install_dir.deleteTree(io, try release_name(alloc, rel.*));
-    try extract_xz(alloc, io, cp, rel.*, tbl_intf);
+    if (default_os == .windows) {
+        try extract_zip(alloc, io, cp, rel.*, &tarball_reader);
+    } else {
+        try extract_xz(alloc, io, cp, rel.*, tbl_intf);
+    }
 
     try cp.download_dir.deleteFile(io, tarball_dw_filename);
 }
@@ -250,6 +255,38 @@ inline fn extract_xz(alloc: Allocator, io: Io, dirs: CommonPaths, rel: Release, 
     try std.tar.pipeToFileSystem(io, release_dir, intf, .{ .strip_components = 1 });
 }
 
+fn extract_zip(alloc: Allocator, io: Io, dirs: CommonPaths, rel: Release, reader: *File.Reader) !void {
+    var zip_archive = try ZipArchive.openFromFileReader(alloc, reader);
+    defer zip_archive.close();
+
+    const rel_name = try release_name(alloc, rel);
+    var release_dir = try dirs.install_dir.createDirPathOpen(io, rel_name, .{});
+    defer release_dir.close(io);
+
+    var members_it = zip_archive.members.iterator();
+    while (members_it.next()) |member| {
+        const entry_name = member.key_ptr.*;
+        const entry = member.value_ptr;
+
+        // Skip the top-level directory (strip_components = 1)
+        const first_slash_pos = std.mem.indexOfScalar(u8, entry_name, '/') orelse continue;
+        const relative_path = entry_name[first_slash_pos + 1 ..];
+        if (relative_path.len == 0) continue;
+
+        if (entry.is_dir) {
+            try release_dir.createDirPath(io, relative_path);
+        } else {
+            if (std.fs.path.dirname(relative_path)) |dir_name| {
+                try release_dir.createDirPath(io, dir_name);
+            }
+            var file = try release_dir.createFile(io, relative_path, .{});
+            defer file.close(io);
+            var fwriter = file.writer(io, &.{});
+            try entry.decompressWriter(&fwriter.interface);
+        }
+    }
+}
+
 pub fn target_name() []const u8 {
     return @tagName(default_arch) ++ "-" ++ @tagName(default_os);
 }
@@ -257,5 +294,6 @@ pub fn target_name() []const u8 {
 pub fn dw_tarball_name(alloc: Allocator, rel: Release) ![]const u8 {
     const release_string = rel.releaseName();
     const dw_target = comptime target_name();
-    return try std.mem.concat(alloc, u8, &[_][]const u8{ "zig-" ++ dw_target ++ "-", release_string, ".tar.xz.partial" });
+    const extension = if (default_os == .windows) ".zip.partial" else ".tar.xz.partial";
+    return try std.mem.concat(alloc, u8, &[_][]const u8{ "zig-" ++ dw_target ++ "-", release_string, extension });
 }
