@@ -2,6 +2,9 @@
 
 This file documents all changes made to the project and is updated before each release.
 
+## v0.8.2 [2026-04-04]
+- Fix windows installer not detecting archives correctly
+
 ## v0.8.1 [2026-04-04]
 - Upgrade to zip.zig v0.3.7
 
