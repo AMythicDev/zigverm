@@ -3,8 +3,8 @@
     .version = "0.7.3",
     .dependencies = .{
         .zip = .{
-            .url = "https://github.com/AMythicDev/zip.zig/archive/refs/tags/v0.3.6.tar.gz",
-            .hash = "zip-0.3.4-eQGR_w1jAADGiS9F5F3vHnME13KeTDBWcbGyjLfNtvjE",
+            .url = "https://github.com/AMythicDev/zip.zig/archive/refs/tags/v0.3.7.tar.gz",
+            .hash = "zip-0.3.7-eQGR_ydjAAAbzEvlTEp-mG3WZubv0Ts-JCWWB_NkaPS9",
         },
     },
     .minimum_zig_version = "0.15.1",
