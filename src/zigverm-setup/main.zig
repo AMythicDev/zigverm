@@ -75,8 +75,11 @@ pub fn main(init: std.process.Init) !void {
     const full_dl_filename = try std.mem.concat(allocator, u8, &.{ dl_filename, ".zip" });
     const assets = parsed.value.object.get("assets").?.array;
 
+    std.debug.print("{any} {s}\n", .{ assets, full_dl_filename });
+
     var tarball = for (assets.items) |asset| {
         if (streql(full_dl_filename, asset.object.get("name").?.string)) {
+            std.debug.print("found match\n", .{});
             break DownloadTarball{
                 .filename = full_dl_filename,
                 .url = asset.object.get("browser_download_url").?.string,
