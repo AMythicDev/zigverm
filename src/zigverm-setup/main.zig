@@ -126,11 +126,14 @@ fn writeFilesFromZip(io: Io, bin_dir: std.Io.Dir, zipFile: ZipArchive, filename:
     const entry = zipFile.getFileByName(filename) orelse unreachable;
     const out_filename = path.basename(filename);
     var file = try bin_dir.createFile(io, out_filename, .{ .truncate = true });
+    defer file.close(io);
     var fwriter = file.writer(io, &.{});
     const writer = &fwriter.interface;
-    defer file.close(io);
     var entry_ptr = @constCast(&entry);
     try entry_ptr.decompressWriter(writer);
+    if (builtin.os.tag != .windows) {
+        try file.setPermissions(io, std.Io.File.Permissions.fromMode(0o755));
+    }
 }
 
 fn download_tarball(
